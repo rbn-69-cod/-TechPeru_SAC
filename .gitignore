@@ -1,0 +1,12 @@
+.venv/
+node_modules/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+storage/*
+!storage/.gitkeep
+.DS_Store
+test-results/
+playwright-report/

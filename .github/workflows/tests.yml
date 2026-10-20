@@ -1,0 +1,27 @@
+name: Validate application
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          find api services config database bin -name '*.php' -print0 | xargs -0 -n1 php -l
+          php -l router.php
+          node --check js/app.js
+      - name: Integration
+        run: |
+          APP_DEMO=1 DB_PATH=/tmp/bsc-ci.sqlite php -S 127.0.0.1:18080 router.php >/tmp/bsc-server.log 2>&1 &
+          trap 'kill $!' EXIT
+          for attempt in 1 2 3 4 5; do curl -fsS http://127.0.0.1:18080/index.html >/dev/null && break || sleep 1; done
+          python3 tests/integration.py

@@ -1,0 +1,1 @@
+Estas páginas conservan enlaces directos a las ocho vistas de la SPA (`../index.html#...`). La aplicación necesita el servidor PHP y una sesión autenticada. La persistencia se realiza en SQLite, no en localStorage.

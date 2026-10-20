@@ -1,0 +1,7 @@
+.git
+.venv
+node_modules
+storage
+*.sqlite
+**/*.sqlite
+.env

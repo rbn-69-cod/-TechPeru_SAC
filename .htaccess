@@ -1,0 +1,10 @@
+Options -Indexes
+RewriteEngine On
+RewriteRule ^$ index.html [L]
+RewriteRule ^(index\.html|css/[a-zA-Z0-9_.-]+\.css|js/app\.js|html/[a-z-]+\.html|api/(auth|dashboard|objectives|kpis|measurements|initiatives|reports|admin|activity)\.php)$ - [L]
+RewriteRule ^ - [R=404,L]
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "same-origin"
+</IfModule>
