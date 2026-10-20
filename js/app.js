@@ -1,3 +1,6 @@
+import { createApiClient } from './api.js';
+import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
+
 /**
  * TECHPERU SAC — BALANCED SCORECARD 2025
  * Frontend conectado a Backend PHP 8.3 & SQLite
@@ -6,14 +9,11 @@
 (() => {
   "use strict";
 
-  const $ = (s, root = document) => root.querySelector(s);
-  const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 
   let currentUser = null;
-  let csrfToken = "";
   let modalReturnFocus = null;
   let currentPage = "dashboard";
-  let dashboardViewMode = "excel"; // 'excel', 'cuadrantes', 'graficos'
+  let dashboardViewMode = matchMedia("(max-width: 800px)").matches ? "graficos" : "excel"; // 'excel', 'cuadrantes', 'graficos'
   let activeExcelFilter = null;
   let activeRespFilter = null;
   let charts = {};
@@ -21,6 +21,7 @@
   let rendering = false;
   let renderQueued = false;
   let currentDashboardData = null;
+  let pendingKpiStatus = "";
 
   const perspectives = {
     financiera: { label: "Financiera", title: "💰 PERSPECTIVA FINANCIERA", color: "#1f3864", soft: "#edf4ff", icon: "💰" },
@@ -43,40 +44,24 @@
   // ========================================================
   // HELPERS Y COMUNICACIÓN CON PHP BACKEND
   // ========================================================
-  async function apiFetch(endpoint, options = {}) {
-    try {
-      options.headers = options.headers || {};
-      if (options.body && typeof options.body === "object" && !(options.body instanceof FormData)) {
-        options.headers["Content-Type"] = "application/json";
-        options.body = JSON.stringify(options.body);
+  const apiFetch = createApiClient({
+    onUnauthorized: () => { currentUser = null; showLogin(); },
+    onError: error => {
+      toast(error.message, 'error');
+      const region = $('#modalError');
+      if (region && !$('#modalLayer').classList.contains('hidden')) {
+        region.textContent = error.message;
+        region.classList.remove('hidden');
       }
-      if (options.method && options.method !== 'GET') options.headers['X-CSRF-Token'] = csrfToken;
-      const res = await fetch(endpoint, {credentials: 'same-origin', ...options});
-      if (!res.headers.get('content-type')?.includes('application/json')) throw new Error('El servidor no está disponible. Ejecuta la aplicación con PHP.');
-      const json = await res.json();
-      if (json.csrf_token) csrfToken = json.csrf_token;
-      if (res.status === 401 && !endpoint.includes('action=login')) { currentUser = null; showLogin(); }
-      if (!res.ok) {
-        throw new Error(json.error || `Error ${res.status}: ${res.statusText}`);
+      if (!$('#loginView').classList.contains('hidden')) {
+        $('#loginError').textContent = error.message;
+        $('#loginError').classList.remove('hidden');
       }
-      return json;
-    } catch (e) {
-      console.error(`API Error [${endpoint}]:`, e);
-      toast(e.message, "error");
-      throw e;
     }
-  }
+  });
 
-  function escapeHtml(s) {
-    return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  }
-
-  function fmt(n, d = 1) {
-    return n === null || n === undefined || isNaN(n) ? "—" : Number(n).toLocaleString("es-PE", { maximumFractionDigits: d, minimumFractionDigits: 0 });
-  }
-
-  function currency(n) {
-    return "S/ " + Number(n || 0).toLocaleString("es-PE", { maximumFractionDigits: 0 });
+  async function runAction(action) {
+    try { await action(); } catch { /* The API client displays request failures. */ }
   }
 
   function toast(msg, type = "success") {
@@ -119,6 +104,7 @@
   // ========================================================
   async function login(email, password) {
     try {
+      await apiFetch("api/auth.php?action=me");
       const data = await apiFetch("api/auth.php?action=login", {
         method: "POST",
         body: { email, password }
@@ -173,16 +159,35 @@
   }
 
   function showLogin() {
+    closeModal();
+    setSidebar(false);
+    destroyCharts();
+    $('.notification-pop')?.remove();
+    $('#pageContent').replaceChildren();
+    $('#loginPass').value = '';
     $("#appView").classList.add("hidden");
     $("#loginView").classList.remove("hidden");
+  }
+
+  function setSidebar(open) {
+    const mobile = matchMedia('(max-width: 800px)').matches;
+    const sidebar = $('#sidebar');
+    sidebar.classList.toggle('open', mobile && open);
+    sidebar.inert = mobile && !open;
+    sidebar.setAttribute('aria-hidden', String(mobile && !open));
+    $('#menuToggle').setAttribute('aria-expanded', String(mobile && open));
+    $('#sidebarBackdrop').classList.toggle('hidden', !mobile || !open);
+    $('.main-column').inert = mobile && open;
+    document.body.classList.toggle('sidebar-open', mobile && open);
+    if (mobile && open) $('#sidebarClose').focus();
+    else if (mobile && sidebar.contains(document.activeElement)) $('#menuToggle').focus();
   }
 
   function navigate(page) {
     if (!pageTitles[page]) page = 'dashboard';
     if (page === 'administracion' && currentUser?.role !== 'Administrador') page = 'dashboard';
     currentPage = page;
-    $("#sidebar").classList.remove('open');
-    $("#menuToggle").setAttribute('aria-expanded', 'false');
+    setSidebar(false);
     $$('.nav-item').forEach(b => b.setAttribute('aria-current', b.dataset.page === page ? 'page' : 'false'));
     window.location.hash = page;
     $("#breadcrumbPage").textContent = pageTitles[page] || "Dashboard ejecutivo";
@@ -198,7 +203,7 @@
     rendering = true;
     destroyCharts();
     const main = $("#pageContent");
-    main.innerHTML = `<div style="text-align:center;padding:40px;color:#64748b">Cargando datos ...</div>`;
+    main.innerHTML = `<div class="loading-state">Cargando datos...</div>`;
 
     main.setAttribute("aria-busy", "true");
     try {
@@ -214,6 +219,7 @@
       default: await renderDashboard(main); break;
     }
     enhanceContent(main);
+    main.dataset.page = currentPage;
     } catch (error) {
       main.innerHTML = `<section class="empty-state" role="alert"><h2>No pudimos cargar esta vista</h2><p>${escapeHtml(error.message)}</p><button class="btn primary" id="retryView">Reintentar</button></section>`;
       $('#retryView').onclick = renderCurrentPage;
@@ -237,7 +243,7 @@
     } else if (dashboardViewMode === "cuadrantes") {
       contentHtml = renderQuadrants(res.perspectives);
     } else {
-      contentHtml = renderChartsBlock(res.perspectives);
+      contentHtml = renderChartsBlock(res.perspectives, res.trend);
     }
 
     container.innerHTML = `
@@ -283,16 +289,16 @@
       </section>
 
       <!-- BARRA DE FILTRO POR RESPONSABLE Y ESTADO -->
-      <div style="background:#fff;padding:12px 16px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-        <div class="dashboard-responsible-filter" style="display:flex;align-items:center;gap:10px">
+      <div class="dashboard-toolbar">
+        <div class="filter-row dashboard-responsible-filter">
           <strong>👤 Filtrar por Responsable:</strong>
-          <select id="dashFilterResp" style="padding:6px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:11px;min-width:240px">
+          <select id="dashFilterResp" class="filter-select">
             <option value="">-- Todos los Responsables (${res.responsibles.length}) --</option>
             ${res.responsibles.map(r => `<option value="${escapeHtml(r.responsible)}" ${activeRespFilter === r.responsible ? 'selected' : ''}>${escapeHtml(r.responsible)} (${escapeHtml(r.responsible_area)})</option>`).join("")}
           </select>
           ${activeRespFilter ? `<button class="btn small soft" id="btnClearRespFilter">✕ Limpiar filtro</button>` : ""}
         </div>
-        <div style="font-size:11px;color:#64748b">
+        <div class="supporting-text">
           Mostrando <strong>${g.total}</strong> KPIs
         </div>
       </div>
@@ -303,7 +309,7 @@
           <div class="health-badge ${g.status_key}">
             ⚠️ Cumplimiento Promedio: ${fmt(g.avg_pct)}% — ${g.status_text}
           </div>
-          <span style="font-size:11px;color:#64748b">(Datos actualizados)</span>
+          <span class="supporting-text">(Datos actualizados)</span>
         </div>
         <div class="health-stats">
           <span class="pill-stat good">✅ LOGRADO: ${g.logrado} KPIs</span>
@@ -350,7 +356,7 @@
                   <td>${renderRespChip(k.responsible, k.responsible_area)}</td>
                   <td><span class="tag">${escapeHtml(k.responsible_area)}</span></td>
                   <td>${fmt(k.target)} <small class="muted">${escapeHtml(k.unit)}</small></td>
-                  <td><strong style="color:#002060">${fmt(k.current_real)}</strong></td>
+                  <td><strong class="result-value">${fmt(k.current_real)}</strong></td>
                   <td><span class="status bad">❌ ${fmt(k.compliance_pct)}%</span></td>
                   <td style="max-width:300px;white-space:normal;font-size:11px">${escapeHtml(k.action_recommended)}</td>
                   <td><button class="btn small soft" data-action="quick-measure" data-id="${escapeHtml(k.id)}">Medir</button></td>
@@ -380,7 +386,7 @@
 
     let rowsHtml = "";
     persps.forEach(p => {
-      const pKpis = list.filter(k => k.perspective_id === p.key);
+      const pKpis = list.filter(k => k.perspective_id === p.key).sort((a, b) => a.objective_id.localeCompare(b.objective_id) || a.num - b.num);
       if (!pKpis.length) return;
 
       pKpis.forEach((kpi, kIdx) => {
@@ -397,11 +403,9 @@
               <strong>${escapeHtml(kpi.name)}</strong>
               <div style="margin-top:4px">${renderRespChip(kpi.responsible, kpi.responsible_area)}</div>
             </td>
-            <td style="text-align:center">${escapeHtml(kpi.unit)}</td>
+            <td class="text-center">${escapeHtml(kpi.unit)}</td>
             <td class="excel-bold-num">${fmt(kpi.target)}</td>
-            <td class="excel-blue-num" data-action="quick-measure" data-id="${escapeHtml(kpi.id)}" title="Clic para registrar nuevo valor real">
-              ${fmt(kpi.current_real)}
-            </td>
+            <td class="excel-blue-num"><button class="text-action" data-action="quick-measure" data-id="${escapeHtml(kpi.id)}" aria-label="Registrar resultado de ${escapeHtml(kpi.name)}">${fmt(kpi.current_real)}</button></td>
             <td class="excel-bold-num">${fmt(kpi.compliance_pct)}%</td>
             <td class="excel-status ${statusClass}"><b>${escapeHtml(kpi.status)}</b></td>
             <td style="font-size:10.5px;max-width:300px;white-space:normal">${escapeHtml(kpi.action_recommended)}</td>
@@ -415,7 +419,7 @@
       <div class="excel-title-banner">
         BALANCED SCORECARD — TechPeru SAC 2025 · ${list.length} indicadores
       </div>
-      <div style="background:#f8fafc;padding:8px 14px;border-bottom:1px solid #d9e1f2;font-size:11px;color:#64748b;display:flex;justify-content:space-between">
+      <div class="table-help">
         <span>💡 <strong>Valores en AZUL:</strong> Haz clic en cualquier valor real para registrar una nueva medición en la base de datos SQLite.</span>
         <span>Regla: ✅ ≥90% | ⚠️ 75-89% | ❌ &lt;75%</span>
       </div>
@@ -450,7 +454,7 @@
 
   function renderQuadrants(perspectives) {
     return `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+    <div class="quadrant-grid">
       ${perspectives.map(p => `
         <div class="panel" style="padding:0;overflow:hidden">
           <div style="background:${p.soft_color};color:${p.color};padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0">
@@ -476,7 +480,7 @@
                     <td><strong>${escapeHtml(k.name)}</strong></td>
                     <td>${renderRespChip(k.responsible, k.responsible_area)}</td>
                     <td>${fmt(k.target)} <small class="muted">${escapeHtml(k.unit)}</small></td>
-                    <td><strong style="color:#002060">${fmt(k.current_real)}</strong></td>
+                    <td><strong class="result-value">${fmt(k.current_real)}</strong></td>
                     <td><span class="status ${sClass}">${fmt(k.compliance_pct)}%</span></td>
                   </tr>
                   `;
@@ -490,7 +494,7 @@
     `;
   }
 
-  function renderChartsBlock(perspectives) {
+  function renderChartsBlock(perspectives, trend) {
     return `
     <div class="grid dashboard-grid">
       <div class="panel">
@@ -500,7 +504,8 @@
             <p>Promedio de cumplimiento por perspectiva</p>
           </div>
         </div>
-        <div class="chart-wrap"><canvas id="perspChart"></canvas></div>
+        ${window.Chart ? '<div class="chart-wrap"><canvas id="perspChart" role="img" aria-label="Cumplimiento por perspectiva. Datos en la tabla siguiente."></canvas></div>' : '<p class="chart-unavailable">Gráfico no disponible. Puedes consultar todos los datos en la tabla.</p>'}
+        <details ${!window.Chart ? 'open' : ''}><summary>Consultar datos por perspectiva</summary><div class="table-scroll"><table><thead><tr><th>Perspectiva</th><th>Cumplimiento</th></tr></thead><tbody>${perspectives.map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${fmt(p.avg_pct)}%</td></tr>`).join('')}</tbody></table></div></details>
       </div>
       <div class="panel">
         <div class="panel-head">
@@ -509,7 +514,8 @@
             <p>Evolución de mediciones registradas en el período</p>
           </div>
         </div>
-        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+        ${window.Chart && trend.length ? '<div class="chart-wrap"><canvas id="trendChart" role="img" aria-label="Tendencia de cumplimiento. Datos en la tabla siguiente."></canvas></div>' : '<p class="chart-unavailable">Consulta las mediciones históricas en la tabla.</p>'}
+        <details ${!window.Chart ? 'open' : ''}><summary>Consultar datos históricos</summary><div class="table-scroll"><table><thead><tr><th>Período</th><th>Fecha</th><th>Cumplimiento</th></tr></thead><tbody>${trend.map(t => `<tr><td>${escapeHtml(t.period)}</td><td>${escapeHtml(t.date)}</td><td>${fmt(t.avg_pct)}%</td></tr>`).join('')}</tbody></table></div></details>
       </div>
     </div>
     `;
@@ -532,7 +538,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        scales: { y: { min: 0, max: 120 } }
+        scales: { y: { beginAtZero: true, suggestedMax: 100 } }
       }
     });
   }
@@ -556,51 +562,33 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        scales: { y: { min: 50, max: 110 } }
+        scales: { y: { beginAtZero: true, suggestedMax: 100 } }
       }
     });
   }
 
   function bindDashboardEvents() {
-    $("#btnExportDashCSV")?.addEventListener("click", () => {
-      window.location.href = "api/reports.php?action=export_csv";
+    $('#btnExportDashCSV').onclick = () => { location.href = 'api/reports.php?action=export_csv'; };
+    $('#btnNewMeasurement').onclick = () => runAction(() => openMeasurementModal());
+    $('#dashFilterResp').onchange = event => { activeRespFilter = event.target.value || null; renderCurrentPage(); };
+    if ($('#btnClearRespFilter')) $('#btnClearRespFilter').onclick = () => { activeRespFilter = null; renderCurrentPage(); };
+    $$('[data-view]').forEach(button => {
+      button.setAttribute('aria-pressed', String(button.dataset.view === dashboardViewMode));
+      button.onclick = () => { dashboardViewMode = button.dataset.view; renderCurrentPage(); };
     });
-    $("#btnNewMeasurement")?.addEventListener("click", () => openMeasurementModal());
-
-    $("#dashFilterResp")?.addEventListener("change", e => {
-      activeRespFilter = e.target.value || null;
-      renderDashboard($("#pageContent"));
+    $$('[data-sheet-filter]').forEach(button => {
+      button.setAttribute('aria-pressed', String(button.dataset.sheetFilter === (activeExcelFilter || '')));
+      button.onclick = () => {
+        activeExcelFilter = button.dataset.sheetFilter || null;
+        $('#dashboardMainArea').innerHTML = renderExcelTable(currentDashboardData.all_kpis, activeExcelFilter);
+        bindDashboardEvents();
+        enhanceContent($('#dashboardMainArea'));
+      };
     });
-
-    $("#btnClearRespFilter")?.addEventListener("click", () => {
-      activeRespFilter = null;
-      renderDashboard($("#pageContent"));
+    $("#pageContent").querySelectorAll('[data-action="quick-measure"]').forEach(button => {
+      button.onclick = () => runAction(() => openMeasurementModal(button.dataset.id));
     });
-
-    $$("[data-view]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        dashboardViewMode = btn.dataset.view;
-        renderCurrentPage();
-      });
-    });
-
-    $$("[data-sheet-filter]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        activeExcelFilter = btn.dataset.sheetFilter || null;
-        const mainArea = $("#dashboardMainArea");
-        if (mainArea && currentDashboardData) {
-          mainArea.innerHTML = renderExcelTable(currentDashboardData.all_kpis, activeExcelFilter);
-          bindDashboardEvents();
-        }
-      });
-    });
-
-    $$("[data-action='quick-measure']").forEach(btn => {
-      btn.addEventListener("click", () => openMeasurementModal(btn.dataset.id));
-    });
-    $$("[data-action='go-mediciones']").forEach(btn => {
-      btn.addEventListener("click", () => navigate("mediciones"));
-    });
+    $$('[data-action="go-mediciones"]').forEach(button => { button.onclick = () => navigate('mediciones'); });
   }
 
   // 2. MAPA ESTRATÉGICO
@@ -667,9 +655,9 @@
     `;
 
     $("#btnExportMapCSV")?.addEventListener("click", () => window.location.href = "api/reports.php?action=export_csv");
-    $("#btnNewObj")?.addEventListener("click", () => openObjectiveForm());
+    $("#btnNewObj")?.addEventListener("click", () => runAction(() => openObjectiveForm()));
     $$("[data-action='obj-detail']").forEach(btn => {
-      btn.addEventListener("click", () => showObjectiveDetail(btn.dataset.id));
+      btn.addEventListener("click", () => runAction(() => showObjectiveDetail(btn.dataset.id)));
     });
   }
 
@@ -714,7 +702,7 @@
       </div>
     `;
 
-    $("#btnCreateObj")?.addEventListener("click", () => openObjectiveForm());
+    $("#btnCreateObj")?.addEventListener("click", () => runAction(() => openObjectiveForm()));
     $("#objSearch")?.addEventListener("input", filterObjTable);
     $("#objFilterPersp")?.addEventListener("change", filterObjTable);
     bindObjActions();
@@ -733,14 +721,14 @@
     }
 
     function renderObjRows(list) {
-      if (!list.length) return `<tr><td colspan="9" style="text-align:center;padding:24px">No se encontraron objetivos.</td></tr>`;
+      if (!list.length) return `<tr><td colspan="9" class="empty-cell">No se encontraron objetivos.</td></tr>`;
       return list.map(o => `
         <tr>
           <td><span class="code">${escapeHtml(o.id)}</span></td>
           <td><strong>${escapeHtml(o.name)}</strong></td>
           <td><span class="tag">${escapeHtml(o.perspective_name)}</span></td>
           <td><strong>${escapeHtml(o.leader || 'Dirección General')}</strong></td>
-          <td style="text-align:center">${o.kpi_count}</td>
+          <td class="text-center">${o.kpi_count}</td>
           <td><span class="status ${o.status_key}">${fmt(o.avg_pct)}%</span></td>
           <td><span class="tag">${escapeHtml(o.priority)}</span></td>
           <td><span class="status good">${escapeHtml(o.status)}</span></td>
@@ -754,8 +742,8 @@
     }
 
     function bindObjActions() {
-      $$("[data-action='view-obj']").forEach(b => b.onclick = () => showObjectiveDetail(b.dataset.id));
-      $$("[data-action='edit-obj']").forEach(b => b.onclick = () => openObjectiveForm(b.dataset.id));
+      $$("[data-action='view-obj']").forEach(b => b.onclick = () => runAction(() => showObjectiveDetail(b.dataset.id)));
+      $$("[data-action='edit-obj']").forEach(b => b.onclick = () => runAction(() => openObjectiveForm(b.dataset.id)));
       $$("[data-action='del-obj']").forEach(b => b.onclick = () => deleteObjective(b.dataset.id));
     }
   }
@@ -812,12 +800,13 @@
       </div>
     `;
 
-    $("#btnCreateKpi")?.addEventListener("click", () => openKpiForm());
+    $("#btnCreateKpi")?.addEventListener("click", () => runAction(() => openKpiForm()));
     $("#kpiSearch")?.addEventListener("input", filterKpiTable);
     $("#kpiFilterPersp")?.addEventListener("change", filterKpiTable);
     $("#kpiFilterResp")?.addEventListener("change", filterKpiTable);
     $("#kpiFilterStatus")?.addEventListener("change", filterKpiTable);
     bindKpiActions();
+    if (pendingKpiStatus) { $("#kpiFilterStatus").value = pendingKpiStatus; pendingKpiStatus = ""; filterKpiTable(); }
 
     function filterKpiTable() {
       const q = $("#kpiSearch").value.toLowerCase();
@@ -840,7 +829,7 @@
     }
 
     function renderKpiRows(list) {
-      if (!list.length) return `<tr><td colspan="10" style="text-align:center;padding:24px">No se encontraron indicadores con los filtros aplicados.</td></tr>`;
+      if (!list.length) return `<tr><td colspan="10" class="empty-cell">No se encontraron indicadores con los filtros aplicados.</td></tr>`;
       return list.map(k => {
         const sClass = (k.compliance_pct >= 90) ? "good" : (k.compliance_pct >= 75) ? "warn" : "bad";
         return `
@@ -849,8 +838,8 @@
           <td><strong>${escapeHtml(k.name)}</strong></td>
           <td>${renderRespChip(k.responsible, k.responsible_area)}</td>
           <td><span class="tag">${escapeHtml(k.responsible_area || k.perspective_name)}</span></td>
-          <td style="text-align:right"><strong>${fmt(k.target)}</strong> <small class="muted">${escapeHtml(k.unit)}</small></td>
-          <td style="text-align:right"><strong style="color:#002060">${fmt(k.current_real)}</strong></td>
+          <td class="text-right"><strong>${fmt(k.target)}</strong> <small class="muted">${escapeHtml(k.unit)}</small></td>
+          <td class="text-right"><strong class="result-value">${fmt(k.current_real)}</strong></td>
           <td><span class="status ${sClass}">${fmt(k.compliance_pct)}%</span></td>
           <td><span class="status ${sClass}">${escapeHtml(k.status)}</span></td>
           <td><small>${escapeHtml(k.frequency || 'Trimestral')}</small></td>
@@ -864,8 +853,8 @@
     }
 
     function bindKpiActions() {
-      $$("[data-action='measure-kpi']").forEach(b => b.onclick = () => openMeasurementModal(b.dataset.id));
-      $$("[data-action='edit-kpi']").forEach(b => b.onclick = () => openKpiForm(b.dataset.id));
+      $$("[data-action='measure-kpi']").forEach(b => b.onclick = () => runAction(() => openMeasurementModal(b.dataset.id)));
+      $$("[data-action='edit-kpi']").forEach(b => b.onclick = () => runAction(() => openKpiForm(b.dataset.id)));
       $$("[data-action='del-kpi']").forEach(b => b.onclick = () => deleteKpi(b.dataset.id));
     }
   }
@@ -880,7 +869,7 @@
         <button class="btn primary" id="btnOpenNewMeasure">＋ Nueva medición</button>
       `)}
 
-      <div class="grid split-grid" style="margin-bottom:20px">
+      <div class="section-space grid split-grid">
         <!-- FORMULARIO DIRECTO -->
         <div class="panel">
           <div class="panel-head">
@@ -908,7 +897,7 @@
             </div>
             <div class="field">
               <label>Fecha de Medición *</label>
-              <input type="date" id="directMeasureDate" value="${new Date().toISOString().slice(0, 10)}" required>
+              <input type="date" id="directMeasureDate" value="${today()}" required>
             </div>
             <div class="field full-span">
               <label>Valor Real Obtenido *</label>
@@ -918,7 +907,7 @@
               <label>Observaciones / Análisis de Acción</label>
               <textarea id="directMeasureNotes" placeholder="Detalle de causas o acciones correctivas ejecutadas..."></textarea>
             </div>
-            <div class="full-span" style="text-align:right">
+            <div class="text-right full-span">
               <button class="btn primary" type="submit">Guardar resultado</button>
             </div>
           </form>
@@ -932,11 +921,11 @@
               <p>Lógica automática de negocio del Balanced Scorecard</p>
             </div>
           </div>
-          <div class="info-box" style="margin-bottom:12px">
+          <div class="space-below info-box">
             <strong>KPIs Directos (Mayor = Mejor):</strong><br>
             Cumplimiento = (Real / Meta) × 100
           </div>
-          <div class="info-box" style="margin-bottom:12px">
+          <div class="space-below info-box">
             <strong>KPIs Inversos (Menor = Mejor):</strong><br>
             Defectos, rotación, costos, CAC, tiempo de entrega.<br>
             Cumplimiento = (Meta / Real) × 100
@@ -976,7 +965,7 @@
                   <td><span class="tag">${escapeHtml(m.period)}</span></td>
                   <td><strong>${escapeHtml(m.kpi_name)}</strong></td>
                   <td>${renderRespChip(m.responsible || 'Responsable', m.responsible_area)}</td>
-                  <td><strong style="color:#002060">${fmt(m.value)} ${escapeHtml(m.kpi_unit)}</strong></td>
+                  <td><strong class="result-value">${fmt(m.value)} ${escapeHtml(m.kpi_unit)}</strong></td>
                   <td><span class="status ${m.compliance_pct >= 90 ? 'good' : m.compliance_pct >= 75 ? 'warn' : 'bad'}">${fmt(m.compliance_pct)}%</span></td>
                   <td><small>${escapeHtml(m.registered_by)}</small></td>
                   <td style="max-width:280px;white-space:normal;font-size:10px">${escapeHtml(m.notes || '—')}</td>
@@ -995,9 +984,12 @@
     </div>`);
     $('#previousMeasurements').onclick = () => { measurementOffset = Math.max(0, measurementOffset - 30); renderCurrentPage(); };
     $('#nextMeasurements').onclick = () => { measurementOffset += 30; renderCurrentPage(); };
-    $("#btnOpenNewMeasure")?.addEventListener("click", () => openMeasurementModal());
+    $("#btnOpenNewMeasure")?.addEventListener("click", () => runAction(() => openMeasurementModal()));
     $("#directMeasureForm")?.addEventListener("submit", async e => {
       e.preventDefault();
+      const button = e.currentTarget.querySelector('button[type="submit"]');
+      if (button.disabled) return;
+      button.disabled = true;
       const kpiId = $("#directMeasureKpi").value;
       const period = $("#directMeasurePeriod").value;
       const date = $("#directMeasureDate").value;
@@ -1010,8 +1002,8 @@
           body: { kpi_id: kpiId, period, date, value, notes }
         });
         toast("✓ Medición guardada exitosamente en la base de datos.");
-        renderMeasurements(container);
-      } catch (err) {}
+        renderCurrentPage();
+      } catch (err) {} finally { button.disabled = false; }
     });
   }
 
@@ -1066,8 +1058,8 @@
       </div>
     `;
 
-    $("#btnCreateInit")?.addEventListener("click", () => openInitiativeForm());
-    $$("[data-action='edit-init']").forEach(b => b.onclick = () => openInitiativeForm(b.dataset.id));
+    $("#btnCreateInit")?.addEventListener("click", () => runAction(() => openInitiativeForm()));
+    $$("[data-action='edit-init']").forEach(b => b.onclick = () => runAction(() => openInitiativeForm(b.dataset.id)));
     $$("[data-action='del-init']").forEach(b => b.onclick = () => deleteInitiative(b.dataset.id));
   }
 
@@ -1080,16 +1072,16 @@
         <button class="btn soft" id="btnPrintReport">🖨️ Ver Informe Ejecutivo Impreso</button>
       `)}
 
-      <div class="grid" style="grid-template-columns:repeat(3, 1fr);margin-bottom:20px">
+      <div class="report-grid grid">
         <div class="panel">
           <h3>Resumen Oficial de Indicadores</h3>
           <p>Exporta los 36 indicadores organizados por perspectiva con responsables, fórmulas, metas y valores reales.</p>
-          <button class="btn soft full" style="margin-top:12px" id="btnCardCSV">Descargar CSV con UTF-8 BOM</button>
+          <button class="space-above btn soft full" id="btnCardCSV">Descargar CSV con UTF-8 BOM</button>
         </div>
         <div class="panel">
           <h3>Reporte de Objetivos Críticos</h3>
           <p>Identifica brechas de cumplimiento inferiores al 75% para la toma de decisiones del directorio.</p>
-          <button class="btn soft full" style="margin-top:12px" data-action="filter-crit">Ver KPIs Críticos (${res.critical_kpis.length})</button>
+          <button class="space-above btn soft full" data-action="filter-crit">Ver KPIs Críticos (${res.critical_kpis.length})</button>
         </div>
         <div class="panel">
           <h3>Presupuesto de Iniciativas</h3>
@@ -1101,7 +1093,7 @@
       </div>
 
       <!-- DESEMPEÑO POR RESPONSABLE -->
-      <div class="panel" style="margin-bottom:20px">
+      <div class="section-space panel">
         <div class="panel-head">
           <div>
             <h3>Ranking de Cumplimiento por Responsable</h3>
@@ -1169,7 +1161,7 @@
     $("#btnExportCSVReport")?.addEventListener("click", () => window.location.href = "api/reports.php?action=export_csv");
     $("#btnCardCSV")?.addEventListener("click", () => window.location.href = "api/reports.php?action=export_csv");
     $("#btnPrintReport")?.addEventListener("click", () => window.open("api/reports.php?action=print_html", "_blank"));
-    $$("[data-action='filter-crit']").forEach(b => b.onclick = () => navigate("kpis"));
+    $$("[data-action='filter-crit']").forEach(b => b.onclick = () => { pendingKpiStatus = "bad"; navigate("kpis"); });
   }
 
   // 8. ADMINISTRACIÓN
@@ -1180,7 +1172,7 @@
 
     container.innerHTML = `
       ${pageHead("Administración del Sistema", "Gestión de usuarios, períodos, registro de auditoría y base de datos.", "")}
-      <div class="grid admin-grid" style="grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+      <div class="section-grid grid admin-grid">
         <!-- USUARIOS -->
         <div class="panel">
           <div class="panel-head">
@@ -1240,9 +1232,9 @@
           </table>
 
           <div style="margin-top:20px;border-top:1px solid #e2e8f0;padding-top:16px">
-            <div class="info-box" style="margin-bottom:12px">
+            <div class="space-below info-box">
               <strong>Restaurar Datos Oficiales del Excel:</strong><br>
-              Vuelve a cargar  los 12 objetivos, los 36 KPIs y los responsables oficiales exactos del archivo <code>BSC_TechPeru_Ampliado_2025.XLSX</code>.
+              Vuelve a cargar los 12 objetivos, los 36 KPIs y los responsables oficiales exactos del archivo <code>BSC_TechPeru_Ampliado_2025.XLSX</code>.
             </div>
             <button class="btn danger full" id="btnResetDB">🔄 Restaurar Base de Datos desde Excel</button>
           </div>
@@ -1289,7 +1281,7 @@
         try {
           const r = await apiFetch("api/admin.php?action=reset", { method: "POST" });
           toast(r.message);
-          renderAdmin(container);
+          renderCurrentPage();
         } catch (e) {}
       }
     });
@@ -1301,7 +1293,7 @@
   function showModal(title, bodyHtml, confirmText, onConfirm, eyebrow = "FORMULARIO") {
     $("#modalTitle").textContent = title;
     $("#modalEyebrow").textContent = eyebrow;
-    $("#modalBody").innerHTML = bodyHtml;
+    $("#modalBody").innerHTML = '<p id="modalError" role="alert" class="form-error hidden"></p>' + bodyHtml;
     $("#modalFooter").innerHTML = `
       <button class="btn" id="modalCancelBtn">Cancelar</button>
       ${confirmText ? `<button class="btn primary" id="modalConfirmBtn">${escapeHtml(confirmText)}</button>` : ""}
@@ -1310,7 +1302,7 @@
     $("#modalLayer").classList.remove("hidden");
     $("#appView").inert = true;
     enhanceContent($("#modalBody"));
-    setTimeout(() => $("#modalBody input, #modalBody select, #modalClose")?.focus(), 0);
+    requestAnimationFrame(() => ($('#modalBody input, #modalBody select') || $('#modalClose')).focus());
 
     $("#modalCancelBtn")?.addEventListener("click", closeModal);
     const confirm = async () => {
@@ -1319,6 +1311,7 @@
       const button = $('#modalConfirmBtn');
       if (!button || button.disabled) return;
       button.disabled = true;
+      $('#modalError').classList.add('hidden');
       try { await onConfirm(); } catch (e) { /* apiFetch displays the error */ }
       finally { button.disabled = false; }
     };
@@ -1326,10 +1319,17 @@
     $('#modalBody form')?.addEventListener('submit', e => { e.preventDefault(); confirm(); });
   }
 
+  function trapFocus(event, root) {
+    const elements = $$('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]', root).filter(element => element.getClientRects().length);
+    const first = elements[0], last = elements.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+
   function closeModal() {
     $("#modalLayer").classList.add("hidden");
     $("#appView").inert = false;
-    modalReturnFocus?.focus();
+    if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
   }
 
   async function showObjectiveDetail(id) {
@@ -1361,7 +1361,7 @@
               <td><strong>${escapeHtml(k.name)}</strong></td>
               <td>${renderRespChip(k.responsible, k.responsible_area)}</td>
               <td>${fmt(k.target)} ${escapeHtml(k.unit)}</td>
-              <td><strong style="color:#002060">${fmt(k.current_real)}</strong></td>
+              <td><strong class="result-value">${fmt(k.current_real)}</strong></td>
               <td><span class="status ${k.compliance_pct >= 90 ? 'good' : k.compliance_pct >= 75 ? 'warn' : 'bad'}">${fmt(k.compliance_pct)}%</span></td>
               <td><small>${escapeHtml(k.status)}</small></td>
               <td style="max-width:240px;white-space:normal;font-size:10px">${escapeHtml(k.action_recommended)}</td>
@@ -1425,13 +1425,13 @@
             method: "PUT",
             body: { id: formId, perspective_id: formPersp, name: formName, leader: formLeader, description: formDesc }
           });
-          toast("✓ Objetivo actualizado .");
+          toast("✓ Objetivo actualizado.");
         } else {
           await apiFetch("api/objectives.php", {
             method: "POST",
             body: { id: formId, perspective_id: formPersp, name: formName, leader: formLeader, description: formDesc }
           });
-          toast("✓ Objetivo creado .");
+          toast("✓ Objetivo creado.");
         }
         closeModal();
         renderCurrentPage();
@@ -1576,7 +1576,7 @@
               action_recommended: formAction
             }
           });
-          toast("✓ Indicador actualizado .");
+          toast("✓ Indicador actualizado.");
         } else {
           await apiFetch("api/kpis.php", {
             method: "POST",
@@ -1596,7 +1596,7 @@
               action_recommended: formAction
             }
           });
-          toast("✓ Indicador creado .");
+          toast("✓ Indicador creado.");
         }
         closeModal();
         renderCurrentPage();
@@ -1615,6 +1615,7 @@
 
   async function openMeasurementModal(preselectedKpiId = null) {
     const kpisRes = await apiFetch("api/kpis.php");
+    if (!kpisRes.kpis.length) { toast("Crea un indicador antes de registrar mediciones.", "error"); return; }
     const kpi = preselectedKpiId ? kpisRes.kpis.find(k => k.id === preselectedKpiId) : kpisRes.kpis[0];
 
     showModal("Registrar Resultado (Medición Real)", `
@@ -1637,11 +1638,11 @@
         </div>
         <div class="field">
           <label>Fecha de Medición *</label>
-          <input type="date" id="modalMeasureDate" value="${new Date().toISOString().slice(0, 10)}" required>
+          <input type="date" id="modalMeasureDate" value="${today()}" required>
         </div>
         <div class="field full-span">
           <label>Valor Real Obtenido *</label>
-          <input type="number" step="any" id="modalMeasureVal" value="${kpi?.current_real || ''}" autofocus required>
+          <input type="number" step="any" id="modalMeasureVal" value="${kpi?.current_real ?? ''}" autofocus required>
         </div>
         <div class="field full-span">
           <label>Observaciones / Acción</label>
@@ -1665,7 +1666,7 @@
           method: "POST",
           body: { kpi_id: kpiId, period, date, value: val, notes }
         });
-        toast(`✓ Medición registrada . Nuevo cumplimiento: ${res.compliance_pct}%.`);
+        toast(`✓ Medición registrada. Nuevo cumplimiento: ${res.compliance_pct}%.`);
         closeModal();
         renderCurrentPage();
       } catch (e) {}
@@ -1683,7 +1684,7 @@
 
     showModal(id ? `Editar Iniciativa: ${escapeHtml(init.id)}` : "Nueva Iniciativa Estratégica", `
       <form class="detail-form-grid">
-        <div class="field"><label>Fecha de inicio</label><input type="date" id="formInitStart" required value="${escapeHtml(init.start_date || new Date().toISOString().slice(0,10))}"></div>
+        <div class="field"><label>Fecha de inicio</label><input type="date" id="formInitStart" required value="${escapeHtml(init.start_date || today())}"></div>
         <div class="field"><label>Fecha de cierre</label><input type="date" id="formInitEnd" required value="${escapeHtml(init.end_date || new Date().getFullYear() + '-12-31')}"></div>
         <div class="field full-span"><label>Indicador vinculado (opcional)</label><select id="formInitKpi"><option value="">Sin indicador</option>${kpisRes.kpis.map(k => `<option value="${escapeHtml(k.id)}" ${init.kpi_id === k.id ? 'selected' : ''}>${escapeHtml(k.id)} — ${escapeHtml(k.name)}</option>`).join('')}</select></div>
         <div class="field full-span">
@@ -1702,11 +1703,11 @@
         </div>
         <div class="field">
           <label>Presupuesto (S/) *</label>
-          <input type="number" id="formInitBudget" value="${init.budget}">
+          <input type="number" min="0" step="any" required id="formInitBudget" value="${init.budget}">
         </div>
         <div class="field">
           <label>% Avance</label>
-          <input type="number" min="0" max="100" id="formInitProgress" value="${init.progress_pct}">
+          <input type="number" min="0" max="100" step="any" required id="formInitProgress" value="${init.progress_pct}">
         </div>
         <div class="field">
           <label>Estado</label>
@@ -1739,18 +1740,30 @@
             method: "PUT",
             body: { id, objective_id: objId, kpi_id: kpiId, start_date: startDate, end_date: endDate, name, leader, budget, progress_pct: progress, status }
           });
-          toast("✓ Iniciativa actualizada .");
+          toast("✓ Iniciativa actualizada.");
         } else {
           await apiFetch("api/initiatives.php", {
             method: "POST",
             body: { objective_id: objId, kpi_id: kpiId, start_date: startDate, end_date: endDate, name, leader, budget, progress_pct: progress, status }
           });
-          toast("✓ Iniciativa creada .");
+          toast("✓ Iniciativa creada.");
         }
         closeModal();
         renderCurrentPage();
       } catch (e) {}
     });
+    const filterLinkedKpis = () => {
+      const select = $('#formInitKpi');
+      const previous = select.value;
+      select.innerHTML = '<option value="">Sin indicador</option>' + kpisRes.kpis
+       .filter(kpi => kpi.objective_id === $('#formInitObj').value)
+       .map(kpi => `<option value="${escapeHtml(kpi.id)}">${escapeHtml(kpi.id)} — ${escapeHtml(kpi.name)}</option>`).join('');
+      select.value = [...select.options].some(option => option.value === previous) ? previous : '';
+    };
+    filterLinkedKpis();
+    $('#formInitObj').addEventListener('change', filterLinkedKpis);
+    $('#formInitStart').addEventListener('change', () => { $('#formInitEnd').min = $('#formInitStart').value; });
+    $('#formInitEnd').min = $('#formInitStart').value;
   }
 
   async function deleteInitiative(id) {
@@ -1766,6 +1779,22 @@
     $$('.field', root).forEach(field => {
       const control = $('input, select, textarea', field), label = $('label', field);
       if (label && control?.id) label.htmlFor = control.id;
+    });
+    $$('table', root).forEach(table => {
+      if (!table.closest('.table-scroll')) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'table-scroll';
+        table.before(wrapper); wrapper.append(table);
+      }
+    });
+    $$('.table-scroll', root).forEach(wrapper => {
+      wrapper.tabIndex = 0;
+      wrapper.setAttribute('role', 'region');
+      const title = wrapper.closest('.panel,.table-panel')?.querySelector('h2, h3')?.textContent || pageTitles[currentPage];
+      wrapper.setAttribute('aria-label', `Tabla: ${title}. Desplázate horizontalmente para ver todas las columnas.`);
+    });
+    $$('select', root).forEach(select => {
+      if (!select.labels?.length) select.setAttribute('aria-label', select.options[0]?.textContent || 'Seleccionar filtro');
     });
     $$('th', root).forEach(th => th.scope = 'col');
     $$('input[placeholder]', root).forEach(input => {
@@ -1801,14 +1830,15 @@
       if (currentUser && page !== currentPage) navigate(page);
     });
     document.addEventListener('keydown', e => {
-      if ($('#modalLayer').classList.contains('hidden')) return;
-      if (e.key === 'Escape') closeModal();
-      if (e.key === 'Tab') {
-        const items = $$('button:not(:disabled), input, select, textarea, [tabindex="0"]', $('#modalLayer'));
-        const first = items[0], last = items.at(-1);
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
-        if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      if ($('#modalLayer').classList.contains('hidden')) {
+        if ($('#sidebar').classList.contains('open')) {
+          if (e.key === 'Escape') setSidebar(false);
+          if (e.key === 'Tab') trapFocus(e, $('#sidebar'));
+        }
+        return;
       }
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Tab') trapFocus(e, $('#modalLayer'));
     });
     // Formulario de login
     $("#loginForm")?.addEventListener("submit", async e => {
@@ -1831,12 +1861,11 @@
       if (btn) navigate(btn.dataset.page);
     });
 
-    // Mobile sidebar
-    $("#menuToggle")?.addEventListener("click", () => {
-      const open = $("#sidebar").classList.toggle("open");
-      $("#menuToggle").setAttribute('aria-expanded', String(open));
-    });
-    $("#sidebarClose")?.addEventListener("click", () => { $("#sidebar").classList.remove("open"); $("#menuToggle").setAttribute("aria-expanded", "false"); });
+    $('#menuToggle').addEventListener('click', () => setSidebar(!$('#sidebar').classList.contains('open')));
+    $('#sidebarClose').addEventListener('click', () => setSidebar(false));
+    $('#sidebarBackdrop').addEventListener('click', () => setSidebar(false));
+    matchMedia('(max-width: 800px)').addEventListener('change', () => setSidebar(false));
+    setSidebar(false);
 
     // Modal close
     $("#modalClose")?.addEventListener("click", closeModal);
@@ -1845,7 +1874,7 @@
     });
 
     // Notificaciones popup
-    $("#notificationsBtn")?.addEventListener("click", async () => {
+    $("#notificationsBtn")?.addEventListener("click", () => runAction(async () => {
       const old = $(".notification-pop");
       if (old) { old.remove(); return; }
 
@@ -1870,12 +1899,10 @@
         </div>
       `;
       document.body.append(pop);
-      document.addEventListener("click", function closePop(ev) {
-        if (!pop.contains(ev.target) && ev.target !== $("#notificationsBtn")) {
-          pop.remove();
-          document.removeEventListener("click", closePop);
-        }
-      });
+    }));
+    document.addEventListener('click', event => {
+      const pop = $('.notification-pop');
+      if (pop && !pop.contains(event.target) && !event.target.closest('#notificationsBtn')) pop.remove();
     });
 
     // Hash inicial
