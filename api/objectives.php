@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/common.php';
 
+allowMethods(['GET', 'POST', 'PUT', 'DELETE']);
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -41,20 +42,22 @@ if ($method === 'GET') {
     $stmt->execute($params);
     $objs = $stmt->fetchAll();
 
-    // Agregar estadísticas de KPIs a cada objetivo
-    $allKpis = $pdo->query("SELECT id, objective_id, compliance_pct, status FROM kpis")->fetchAll();
-    foreach ($objs as &$o) {
-        $oKpis = array_filter($allKpis, fn($k) => $k['objective_id'] === $o['id']);
-        $count = count($oKpis);
-        $sum = array_reduce($oKpis, fn($a, $b) => $a + (float)$b['compliance_pct'], 0);
-        $avg = $count > 0 ? round($sum / $count, 1) : 0;
-        $o['kpi_count'] = $count;
-        $o['avg_pct'] = $avg;
-        $o['status_key'] = $avg >= 90.0 ? 'good' : ($avg >= 75.0 ? 'warn' : 'bad');
+    $stats = [];
+    foreach ($pdo->query('SELECT objective_id, COUNT(*) AS total, ROUND(AVG(compliance_pct), 1) AS average FROM kpis GROUP BY objective_id') as $row) {
+        $stats[$row['objective_id']] = $row;
     }
+    foreach ($objs as &$objective) {
+        $objective['kpi_count'] = (int)($stats[$objective['id']]['total'] ?? 0);
+        $objective['avg_pct'] = (float)($stats[$objective['id']]['average'] ?? 0);
+        $objective['status_key'] = complianceKey($objective['avg_pct']);
+    }
+    unset($objective);
 
     jsonResponse(['success' => true, 'objectives' => $objs]);
 }
 
 require_once dirname(__DIR__) . '/services/catalog.php';
-mutateCatalog($pdo, 'objectives');
+requireManager();
+$input = $method === 'DELETE' ? $_GET : getJsonInput();
+$result = mutateCatalog($pdo, 'objectives', $method, $input);
+jsonResponse($result, $method === 'POST' ? 201 : 200);

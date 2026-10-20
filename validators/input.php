@@ -1,6 +1,6 @@
 <?php
 function textField(array $data, string $key, string $default = '', int $max = 300): string {
-    $value = $data[$key] ?? $default;
+    $value = array_key_exists($key, $data) ? $data[$key] : $default;
     if (!is_string($value) || strlen($value) > $max) jsonError("Campo inválido: $key.", 422);
     return trim($value);
 }
@@ -15,7 +15,7 @@ function identifier(array $data, string $key = 'id'): string {
     return $value;
 }
 function numberField(array $data, string $key, float $default = 0, float $min = -1000000000, float $max = 1000000000): float {
-    $value = $data[$key] ?? $default;
+    $value = array_key_exists($key, $data) ? $data[$key] : $default;
     if (is_bool($value) || !is_numeric($value) || !is_finite((float)$value) || $value < $min || $value > $max) jsonError("Número fuera de rango: $key.", 422);
     return (float)$value;
 }
@@ -30,9 +30,10 @@ function dateField(array $data, string $key, string $default): string {
     if (!$date || $date->format('Y-m-d') !== $value) jsonError("Fecha inválida: $key.", 422);
     return $value;
 }
-function findRecord(PDO $pdo, string $table, string $id): array {
-    // Table names are supplied exclusively by server code.
-    $stmt = $pdo->prepare("SELECT * FROM $table WHERE id = ?");
-    $stmt->execute([$id]);
-    return $stmt->fetch() ?: jsonError('Registro no encontrado.', 404);
+
+function integerField(array $data, string $key, int $default, int $min, int $max): int
+{
+    $value = numberField($data, $key, $default, $min, $max);
+    if (floor($value) !== $value) jsonError("Debe ser un número entero: $key.", 422);
+    return (int)$value;
 }

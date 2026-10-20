@@ -5,5 +5,5 @@ return [
     'database' => getenv('DB_PATH') ?: dirname(__DIR__) . '/database/bsc.sqlite',
     'demo' => getenv('APP_DEMO') === '1',
     'secure_cookie' => getenv('SESSION_SECURE') === '1',
-    'session_ttl' => 1800,
+    'session_ttl' => max(60, min(86400, (int)(getenv('SESSION_TTL') ?: 1800))),
 ];

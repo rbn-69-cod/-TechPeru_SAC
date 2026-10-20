@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/common.php';
-$action = $_GET['action'] ?? 'me';
+$action = enumField($_GET, 'action', ['me', 'login', 'logout'], 'me');
 $pdo = getDB();
 if ($action === 'me') {
     allowMethods(['GET']);
@@ -23,11 +23,17 @@ if ($action === 'login') {
     $stmt = $pdo->prepare('SELECT * FROM users WHERE LOWER(email) = ?');
     $stmt->execute([$email]);
     $user = $stmt->fetch();
-    if (!$user || !password_verify($password, $user['password'])) {
+    // Verify a hash for unknown accounts too, avoiding the fast missing-user path.
+    $hash = $user['password'] ?? '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
+    $validPassword = password_verify($password, $hash);
+    if (!$user || !$validPassword) {
         $pdo->prepare('INSERT INTO login_attempts (id, attempts, started_at) VALUES (?, 1, ?) ON CONFLICT(id) DO UPDATE SET attempts = CASE WHEN started_at < ? THEN 1 ELSE attempts + 1 END, started_at = CASE WHEN started_at < ? THEN excluded.started_at ELSE started_at END')->execute([$key, time(), time()-900, time()-900]);
         jsonError('Credenciales incorrectas.', 401);
     }
     $pdo->prepare('DELETE FROM login_attempts WHERE id = ? OR started_at < ?')->execute([$key, time()-900]);
+    if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
+        $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([password_hash($password, PASSWORD_DEFAULT), $user['id']]);
+    }
     unset($user['password']);
     session_regenerate_id(true);
     $_SESSION['user'] = $user;

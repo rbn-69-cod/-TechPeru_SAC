@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/common.php';
 
+allowMethods(['GET', 'POST', 'PUT', 'DELETE']);
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -49,4 +50,7 @@ if ($method === 'GET') {
 }
 
 require_once dirname(__DIR__) . '/services/catalog.php';
-mutateCatalog($pdo, 'initiatives');
+requireManager();
+$input = $method === 'DELETE' ? $_GET : getJsonInput();
+$result = mutateCatalog($pdo, 'initiatives', $method, $input);
+jsonResponse($result, $method === 'POST' ? 201 : 200);

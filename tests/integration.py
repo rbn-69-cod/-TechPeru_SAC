@@ -1,5 +1,5 @@
 """HTTP contract/security regression tests. Run ONLY against an isolated APP_DEMO=1 database."""
-import json, os, unittest, urllib.request, urllib.error, http.cookiejar, uuid
+import csv, io, json, os, unittest, urllib.request, urllib.error, http.cookiejar, uuid
 BASE = os.environ.get('TEST_BASE_URL', 'http://127.0.0.1:18080')
 class Client:
     def __init__(self):
@@ -9,7 +9,7 @@ class Client:
         headers = {'Content-Type': 'application/json'}
         if csrf: headers['X-CSRF-Token'] = self.token
         request = urllib.request.Request(BASE + '/' + path, data=json.dumps(data).encode() if data is not None else None, headers=headers, method=method)
-        try: response = self.http.open(request)
+        try: response = self.http.open(request, timeout=15)
         except urllib.error.HTTPError as error: response = error
         raw = response.read().decode()
         result = json.loads(raw) if 'application/json' in response.headers.get('Content-Type', '') else raw
@@ -114,4 +114,73 @@ class API(unittest.TestCase):
         for _ in range(10):
             self.assertEqual(c.call('api/auth.php?action=login', 'POST', {'email': self.suffix+'@invalid.test', 'password': 'bad'})[0], 401)
         self.assertEqual(c.call('api/auth.php?action=login', 'POST', {'email': self.suffix+'@invalid.test', 'password': 'bad'})[0], 429)
+    def test_null_and_integer_validation(self):
+        kpi = self.create_kpi()
+        for value in [None, True, [], {}, 'not-a-number']:
+            self.assertEqual(self.c.call('api/kpis.php', 'PUT', {'id': kpi, 'current_real': value})[0], 422)
+            self.assertEqual(self.c.call('api/measurements.php', 'POST', {'kpi_id': kpi, 'period': '2025-Q3', 'date': '2025-09-01', 'value': value})[0], 422)
+        for query in ['limit=1.2', 'offset=-1', 'limit[]=2']:
+            self.assertEqual(self.c.call('api/measurements.php?' + query)[0], 422)
+
+    def test_bad_query_and_json_shapes(self):
+        for path in ['api/kpis.php?q[]=x', 'api/objectives.php?id[]=x', 'api/auth.php?action[]=me']:
+            self.assertEqual(self.c.call(path)[0], 422)
+        for value in [[], 'string', 25]:
+            self.assertEqual(self.c.call('api/objectives.php', 'POST', value)[0], 400)
+
+    def test_cross_session_csrf_and_rotation(self):
+        other = Client(); other.call('api/auth.php')
+        old_token = other.token
+        other.token = self.c.token
+        self.assertEqual(other.call('api/auth.php?action=login', 'POST', {'email': 'admin@demo.com', 'password': 'BSC2026!'})[0], 403)
+        other.token = old_token
+        other.login()
+        self.assertNotEqual(other.token, old_token)
+        other.token = old_token
+        self.assertEqual(other.call('api/objectives.php', 'POST', {})[0], 403)
+
+    def test_named_responsible_authorization(self):
+        c = Client(); c.login('carlos.mendoza@techperu.pe')
+        own = {'kpi_id': 'KPI-01', 'period': '2025-Q3', 'date': '2024-01-01', 'value': 10}
+        # Use an isolated test KPI so every row is removed during cleanup.
+        kpi = self.create_kpi()
+        self.c.call('api/kpis.php', 'PUT', {'id': kpi, 'responsible': 'Lic. Carlos Mendoza'})
+        self.assertEqual(c.call('api/measurements.php', 'POST', {**own, 'kpi_id': kpi})[0], 201)
+        self.c.call('api/kpis.php', 'PUT', {'id': kpi, 'responsible': 'Another person'})
+        self.assertEqual(c.call('api/measurements.php', 'POST', {**own, 'kpi_id': kpi, 'date': '2024-01-02'})[0], 403)
+
+    def test_export_escapes_xss_and_csv_formulas(self):
+        kpi = self.create_kpi()
+        text = '<img src=x onerror=alert(1)>'
+        formula = '=HYPERLINK("https://example.test")'
+        self.c.call('api/kpis.php', 'PUT', {'id': kpi, 'name': text, 'action_recommended': formula})
+        html = self.c.call('api/reports.php?action=print_html')[1]
+        self.assertNotIn(text, html)
+        self.assertIn('&lt;img', html)
+        exported = self.c.call('api/reports.php?action=export_csv')[1]
+        rows = list(csv.reader(io.StringIO(exported), delimiter=';'))
+        row = next(row for row in rows if len(row) > 2 and row[2] == kpi)
+        self.assertEqual(row[-1], "'" + formula)
+
+    def test_kpi_move_and_nullable_initiative_link(self):
+        obj = self.create_objective(); kpi = self.create_kpi(obj)
+        result = self.c.call('api/initiatives.php', 'POST', {'objective_id': obj, 'kpi_id': kpi, 'name': 'Link', 'leader': 'QA'})
+        self.assertEqual(result[0], 201)
+        initiative = result[1]['id']
+        self.assertEqual(self.c.call('api/kpis.php', 'PUT', {'id': kpi, 'objective_id': 'OBJ-C1'})[0], 409)
+        self.assertEqual(self.c.call('api/initiatives.php', 'PUT', {'id': initiative, 'kpi_id': None})[0], 200)
+        self.assertEqual(self.c.call('api/kpis.php', 'PUT', {'id': kpi, 'objective_id': 'OBJ-C1'})[0], 200)
+        self.addCleanup(lambda: self.c.call('api/kpis.php?id='+kpi, 'DELETE'))
+        self.assertEqual(self.c.call('api/kpis.php?id='+kpi)[1]['kpi']['perspective_id'], 'clientes')
+
+    def test_backdated_measurement_preserves_recalculated_current_result(self):
+        kpi = self.create_kpi()
+        base = {'kpi_id': kpi, 'period': '2025-Q3', 'date': '2025-09-30', 'value': 8}
+        self.assertEqual(self.c.call('api/measurements.php', 'POST', base)[0], 201)
+        self.assertEqual(self.c.call('api/kpis.php', 'PUT', {'id': kpi, 'target': 20})[0], 200)
+        self.assertEqual(self.c.call('api/measurements.php', 'POST', {**base, 'date': '2025-08-01', 'value': 2})[0], 201)
+        current = self.c.call('api/kpis.php?id='+kpi)[1]['kpi']
+        self.assertEqual(current['compliance_pct'], 40)
+        self.assertEqual(current['measurements'][0]['compliance_pct'], 80)
+
 if __name__ == '__main__': unittest.main(verbosity=2)

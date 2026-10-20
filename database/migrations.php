@@ -1,0 +1,34 @@
+<?php
+/** Additive migration: preserves existing data and upgrades legacy plaintext passwords. */
+function migrateDatabaseV1(PDO $pdo): void {
+    $version = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
+    if ($version >= 1) return;
+    $pdo->beginTransaction();
+    try {
+        $pdo->exec('CREATE TABLE IF NOT EXISTS login_attempts (id TEXT PRIMARY KEY, attempts INTEGER NOT NULL, started_at INTEGER NOT NULL);
+            CREATE INDEX IF NOT EXISTS idx_kpis_objective ON kpis(objective_id);
+            CREATE INDEX IF NOT EXISTS idx_kpis_perspective ON kpis(perspective_id);
+            CREATE INDEX IF NOT EXISTS idx_measurements_date ON measurements(kpi_id, date DESC, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_initiatives_objective ON initiatives(objective_id);
+            CREATE INDEX IF NOT EXISTS idx_measurements_period ON measurements(period, date);
+            CREATE TRIGGER IF NOT EXISTS measurement_duplicate BEFORE INSERT ON measurements
+            WHEN EXISTS (SELECT 1 FROM measurements WHERE kpi_id = NEW.kpi_id AND period = NEW.period AND date = NEW.date)
+            BEGIN SELECT RAISE(ABORT, "Duplicate measurement constraint"); END;');
+        $stmt = $pdo->prepare('UPDATE users SET password = ? WHERE id = ?');
+        foreach ($pdo->query('SELECT id, password FROM users')->fetchAll() as $user) {
+            if (!password_get_info($user['password'])['algo']) $stmt->execute([password_hash($user['password'], PASSWORD_DEFAULT), $user['id']]);
+        }
+        $pdo->exec('PRAGMA user_version = 1');
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+}
+
+function migrateDatabase(PDO $pdo): void
+{
+    migrateDatabaseV1($pdo);
+    if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() >= 2) return;
+    atomic($pdo, function () use ($pdo): void {
+        $pdo->exec(file_get_contents(__DIR__ . '/migrations/002_integrity.up.sql'));
+        $pdo->exec('PRAGMA user_version = 2');
+    });
+}

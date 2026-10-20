@@ -17,7 +17,7 @@ if ($action === 'periods') {
 }
 
 if ($action === 'activity') {
-    $limit = (int)numberField($_GET, 'limit', 30, 1, 200);
+    $limit = integerField($_GET, 'limit', 30, 1, 200);
     $stmt = $pdo->prepare("SELECT * FROM activity_logs ORDER BY id DESC LIMIT ?");
     $stmt->execute([$limit]);
     jsonResponse(['success' => true, 'logs' => $stmt->fetchAll()]);
