@@ -23,14 +23,36 @@
       </div>
       <h1>Bienvenido</h1>
       <p class="muted">Ingresa al Cuadro de Mando Integral oficial de TechPeru SAC (2025).</p>
+
+      <!-- CUENTA DE PRUEBA ACCESO RÁPIDO -->
+      <div class="demo-user-card" id="demoUserCard">
+        <div class="demo-user-head">
+          <span class="demo-user-badge">👤 Usuario de prueba</span>
+          <button type="button" id="btnFillDemoUser" class="btn-demo-quick" title="Hacer clic para autocompletar">Autocompletar</button>
+        </div>
+        <div class="demo-user-body">
+          <div class="demo-user-field">
+            <span class="demo-label">Usuario:</span>
+            <code class="demo-code">admin@demo.com</code>
+          </div>
+          <div class="demo-user-field">
+            <span class="demo-label">Clave:</span>
+            <code class="demo-code">BSC2026!</code>
+          </div>
+        </div>
+        <div class="demo-user-foot">
+          <span>Rol: <b>Administrador General</b> (acceso total a configuración y reportes)</span>
+        </div>
+      </div>
+
       <form id="loginForm">
         <label>
           Usuario / Correo
-          <input id="loginUser" type="email" autocomplete="username" placeholder="nombre@empresa.com" required>
+          <input id="loginUser" type="email" autocomplete="username" value="admin@demo.com" placeholder="nombre@empresa.com" required>
         </label>
         <label>
           Contraseña
-          <input id="loginPass" type="password" autocomplete="current-password" required>
+          <input id="loginPass" type="password" autocomplete="current-password" value="BSC2026!" required>
         </label>
         <p role="alert" id="loginError" class="error-text hidden">Credenciales incorrectas.</p>
         <button class="btn primary full" type="submit">Ingresar al sistema <span>→</span></button>

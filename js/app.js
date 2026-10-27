@@ -264,7 +264,10 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     destroyCharts();
     $('.notification-pop')?.remove();
     $('#pageContent').replaceChildren();
-    $('#loginPass').value = '';
+    const u = $('#loginUser');
+    const p = $('#loginPass');
+    if (u && !u.value) u.value = 'admin@demo.com';
+    if (p && !p.value) p.value = 'BSC2026!';
     $("#appView").classList.add("hidden");
     $("#loginView").classList.remove("hidden");
   }
@@ -2986,6 +2989,20 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       if (e.key === 'Tab') trapFocus(e, $('#modalLayer'));
     });
     // Formulario de login
+    function fillDemoUser() {
+      const u = $("#loginUser");
+      const p = $("#loginPass");
+      if (u) u.value = "admin@demo.com";
+      if (p) p.value = "BSC2026!";
+      $("#loginError")?.classList.add("hidden");
+      $('#loginForm button[type="submit"]')?.focus();
+    }
+    $("#btnFillDemoUser")?.addEventListener("click", e => {
+      e.stopPropagation();
+      fillDemoUser();
+    });
+    $("#demoUserCard")?.addEventListener("click", fillDemoUser);
+
     $("#loginForm")?.addEventListener("submit", async e => {
       e.preventDefault();
       const u = $("#loginUser").value.trim();

@@ -69,6 +69,92 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .login-card label, .field { display: grid; gap: 7px; color: #34465d; font-weight: 600; font-size: 12px; }
 .login-card input, .field input, .field select, .field textarea { width: 100%; border: 1px solid #d8e1ec; border-radius: 8px; background: #fff; padding: 11px 12px; color: var(--ink); min-width: 0; }
 .login-card input { padding: 12px; }
+
+/* Tarjeta de usuario de prueba en Login */
+.demo-user-card {
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  background: #f0f7ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.demo-user-card:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+}
+.demo-user-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.demo-user-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-demo-quick {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease, transform .1s ease;
+}
+.btn-demo-quick:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+.demo-user-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.demo-user-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.demo-label {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+.demo-code {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.demo-user-foot {
+  font-size: 11px;
+  color: #64748b;
+  border-top: 1px dashed #bfdbfe;
+  padding-top: 6px;
+}
+.demo-user-foot b {
+  color: #1e3a8a;
+}
+
 .demo-note { margin: 20px 0 16px; padding: 12px 14px; background: #f5f8fc; border: 1px solid #e6edf5; border-radius: 9px; color: #5f7188; line-height: 1.8; font-size: 11px; }
 .demo-note strong { color: var(--ink); }
 .login-art { background: linear-gradient(140deg, #10294a 0%, #173e6b 50%, #1e5bb4 100%); color: #fff; position: relative; overflow: hidden; display: flex; align-items: center; padding: clamp(36px, 7vw, 110px); }
