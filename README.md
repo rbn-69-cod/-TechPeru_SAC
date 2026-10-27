@@ -1,21 +1,80 @@
-# TechPeru SAC · Balanced Scorecard (BSC 2025)
+# TechPeru SAC · Sistema Integral de Gestión para Botica & Balanced Scorecard 2025
 
-Sistema web empresarial de **Balanced Scorecard (Cuadro de Mando Integral)** desarrollado con arquitectura desacoplada: Frontend interactivo SPA (HTML5 semántico, CSS Grid responsivo, JavaScript ES Modules, Chart.js) y Backend en **PHP 8.3 & SQLite 3 (PDO)** con control transaccional ACID, modo WAL de alta concurrencia, auditoría en tiempo real y persistencia oficial de las 4 perspectivas, 12 objetivos estratégicos, 36 indicadores (KPI) con líderes asignados y 12 iniciativas estratégicas.
+Sistema web empresarial integral para la administración y operación de una **Botica / Farmacia** con Punto de Venta (POS), Despacho FEFO (*First Expired, First Out*), Control de Lotes y Vencimientos, Caja y Arqueo, Compras y Proveedores, Facturación Interna/Electrónica, y conservación total del **Balanced Scorecard (Cuadro de Mando Integral 2025)**.
+
+Desarrollado sobre el repositorio base **TechPeru SAC** con arquitectura desacoplada: Frontend interactivo SPA (HTML5 semántico, CSS Grid responsivo, JavaScript ES Modules, Chart.js), Backend en **PHP 8.3 & SQLite 3 (PDO)** con control transaccional ACID, modo WAL de alta concurrencia, capa de integración con el Gateway de Microservicios **MediZano** (`http://127.0.0.1:8090`) y fallback autónomo resiliente a SQLite.
 
 ---
 
 ## 🔑 Credenciales de Acceso al Sistema
 
-Para ingresar y verificar la aplicación web, el sistema cuenta con cuentas oficiales de prueba en modo demostración (`APP_DEMO=1`):
+Para ingresar y verificar la aplicación web, el sistema cuenta con cuentas oficiales en modo demostración (`APP_DEMO=1`):
 
 | Rol de Usuario | Correo Electrónico | Contraseña | Nivel de Acceso y Funciones |
 | :--- | :--- | :--- | :--- |
-| **Administrador** | `admin@demo.com` | `BSC2026!` | **Dirección General & TI**: Control total, gestión de usuarios, reseteo de claves, activación de períodos, auditoría y restauración demo |
-| **Gerente de Estrategia** | `gerente@demo.com` | `BSC2026!` | **Gerencia Comercial**: Visualización ejecutiva, edición de objetivos, KPIs e iniciativas, y corrección auditada de mediciones |
-| **Responsable de Indicadores** | `responsable@demo.com` | `BSC2026!` | **Control de Gestión**: Registro de mediciones periódicas para todos los KPIs y seguimiento de metas |
-| **Líder de Área** | `carlos.mendoza@techperu.pe` | `BSC2026!` | **Gerencia de Finanzas**: Registro de mediciones exclusivamente para sus KPIs asignados |
+| **Administrador** | `admin@demo.com` | `BSC2026!` | **Dirección General & TI**: Control total de botica, caja, compras, usuarios, auditoría, reportes y Balanced Scorecard |
+| **Farmacéutico** | `farmaceutico@techperu.pe` | `BSC2026!` | **Farmacia & Dispensación**: Punto de Venta (POS), revisión de recetas, inventario, lotes FEFO y Kardex |
+| **Cajero** | `caja@techperu.pe` | `BSC2026!` | **Caja & Ventas**: Apertura y cierre de caja, cobro en POS, emisión de comprobantes y arqueo |
+| **Inventario / Almacén** | `inventario@techperu.pe` | `BSC2026!` | **Almacén**: Recepción de compras, ajuste de existencias y control de caducidades |
+| **Gerente de Estrategia** | `gerente@demo.com` | `BSC2026!` | **Gerencia Comercial**: Visualización ejecutiva, reportes de ventas y Balanced Scorecard |
 
-> **Nota:** La pantalla de inicio de sesión incluye una tarjeta interactiva con botón **"Autocompletar"** para rellenar las credenciales en un solo clic.
+> **Nota:** La pantalla de inicio de sesión incluye una tarjeta interactiva con botón **"Autocompletar"** para rellenar las credenciales del Administrador en un solo clic.
+
+---
+
+## 🏥 Módulos Funcionales de la Botica
+
+1. **Dashboard de Botica (`api/pharmacy_dashboard.php`):**
+   - Métricas en tiempo real de ventas del día, unidades en almacén, inventario valorizado (S/), alertas de lotes próximos a vencer (≤ 90 días) y estado de caja activa.
+   - Gráfico de tendencias de ventas de los últimos 7 días.
+   - Top 5 medicamentos más vendidos y distribución de métodos de pago (Efectivo, Tarjeta, Yape/Plin).
+   - Monitor de estado y salud de integración con MediZano Gateway.
+
+2. **Terminal Punto de Venta - POS (`api/pos.php`):**
+   - Validación obligatoria de turno de caja abierto antes de iniciar ventas.
+   - Búsqueda en tiempo real por código, código de barras EAN/UPC o nombre comercial.
+   - Despacho estricto por política **FEFO** (*First Expired, First Out*), seleccionando y deduciendo automáticamente los lotes con fecha de vencimiento más próxima.
+   - Emisión de Boletas (`B001`), Facturas (`F001`) y Notas de Venta (`NV01`).
+   - Cálculo automático de Subtotal Neto, IGV (18%), vuelto y generación de ticket térmico imprimible.
+
+3. **Catálogo de Medicamentos (`api/products.php`):**
+   - Catálogo cargado con medicamentos oficiales de la industria farmacéutica peruana (Panadol, Amoxil, Apronax, Nastizol, Bismutol, Clavulin, Aspirina, Losartán, Salbutamol, Paracetamol, Ibuprofeno, Omeprazol, Loratadina, etc.).
+   - Clasificación por categorías terapéuticas, laboratorios (Portugal, Medifarma, Roemmers, Genfar, Farmindustria), presentación, concentración, precio de compra, precio de venta, stock mínimo y control de receta médica obligatoria.
+
+4. **Inventario, Lotes y Despacho FEFO (`api/inventory.php`):**
+   - Trazabilidad por número de lote, fecha de fabricación y fecha de caducidad.
+   - Semáforo de vencimientos: Vigente (&gt; 90 días), Próximo a vencer (≤ 90 días) y Vencido (&lt; 0 días).
+   - Ajustes manuales de existencias (Positivo / Negativo) con registro obligatorio de justificación para auditoría.
+
+5. **Kardex de Movimientos:**
+   - Libro de movimientos inmutable que registra `ENTRADA`, `SALIDA`, `VENTA`, `COMPRA`, `AJUSTE_POSITIVO`, `AJUSTE_NEGATIVO` y `ANULACION_VENTA` con stock previo, stock posterior, usuario responsable y fecha/hora exacta.
+
+6. **Compras y Recepción de Mercadería (`api/suppliers.php`):**
+   - Registro de órdenes de compra a droguerías y distribuidores autorizados (Droguería Farmacéutica del Sur, Distribuidora Médica San Borja, Droguería Central Perú).
+   - Recepción de facturas de compra con alta automática de nuevos lotes y reabastecimiento de stock en el producto correspondiente.
+
+7. **Caja, Turnos y Arqueos (`api/cash_register.php`):**
+   - Apertura de turnos con asignación de fondo de sencillo.
+   - Registro de ingresos y egresos de caja menores con justificación.
+   - Cierre de turno y arqueo ciego: cálculo de efectivo teórico del sistema (`Apertura + Ventas Efectivo + Ingresos - Egresos`), comparación con el monto físico declarado y registro de sobrantes/faltantes.
+
+8. **Facturación y Comprobantes (`api/invoices.php`):**
+   - Registro cronológico de comprobantes emitidos.
+   - Vista de ticket térmico imprimible.
+   - Anulación de ventas con devolución automática e intacta de stock a sus respectivos lotes de origen.
+
+9. **Reportes y Exportación Segura (`api/pharmacy_reports.php`):**
+   - Reporte consolidado de ventas diarias.
+   - Ranking de medicamentos por rotación y facturación.
+   - Exportación de Ventas, Inventario y Lotes a formato CSV con sanitización activa para prevenir **CSV Formula Injection** (`=`, `+`, `-`, `@`, `\t`, `\r`).
+
+10. **Integración MediZano y Fallback Local (`services/medizano_client.php`):**
+    - Cliente HTTP PHP orientado a microservicios para comunicarse con el Gateway de MediZano (`http://127.0.0.1:8090`).
+    - Health check con timeout corto (1.5s). Si MediZano está offline, el sistema opera con degradación elegante utilizando SQLite local de manera 100% autónoma.
+
+11. **Módulo Balanced Scorecard 2025 (Conservación Total):**
+    - Todas las vistas del Cuadro de Mando Integral (Dashboard BSC, Mapa Estratégico, 12 Objetivos, 36 KPIs, Registro de Mediciones, Iniciativas y Reportes Ejecutivos) se mantienen operativas y accesibles desde la barra lateral.
+    - Todos los datos históricos (`perspectives`, `objectives`, `kpis`, `initiatives`, `measurements`, `evaluation_periods`) se preservan intactos.
 
 ---
 

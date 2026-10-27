@@ -165,6 +165,147 @@ $tests['period management enforces valid dates and single active period'] = func
     $activeId = $db->query("SELECT id FROM evaluation_periods WHERE status = 'Activo'")->fetchColumn();
     check($activeId === '2026-TEST', 'Correct period activated');
 };
+
+require_once dirname(__DIR__) . '/services/pharmacy_catalog.php';
+require_once dirname(__DIR__) . '/services/inventory.php';
+require_once dirname(__DIR__) . '/services/pos_sales.php';
+require_once dirname(__DIR__) . '/services/cash_register.php';
+require_once dirname(__DIR__) . '/services/purchases.php';
+require_once dirname(__DIR__) . '/services/medizano_client.php';
+
+$tests['pharmacy catalog search and FEFO inventory calculation'] = function () use ($db): void {
+    $prods = getProducts($db, ['search' => 'Paracetamol']);
+    check(count($prods) >= 1, 'Finds products by active principle or commercial name');
+    $p = $prods[0];
+    check(isset($p['lotes']), 'Product includes batch lots');
+    check(count($p['lotes']) > 0, 'Product has at least one active lot');
+    $summary = getInventorySummary($db);
+    check($summary['total_productos'] >= 16, 'Summary counts catalog items');
+    check($summary['valoracion_inventario'] > 0, 'Inventory valuation computed');
+};
+
+$tests['FEFO sale deduction prioritizes earliest expiring batch'] = function () use ($db): void {
+    // Buscar un producto con al menos 2 lotes
+    $p = $db->query("SELECT p.id, p.stock_actual FROM productos p JOIN lotes l ON l.producto_id = p.id GROUP BY p.id HAVING COUNT(l.id) >= 2 LIMIT 1")->fetch();
+    check((bool)$p, 'Found multi-batch product for FEFO test');
+    $prodId = (int)$p['id'];
+    $stockBefore = (int)$p['stock_actual'];
+
+    $lotesBefore = $db->query("SELECT id, numero_lote, fecha_vencimiento, cantidad_actual FROM lotes WHERE producto_id = $prodId AND cantidad_actual > 0 ORDER BY fecha_vencimiento ASC, id ASC")->fetchAll();
+    $earliestLot = $lotesBefore[0];
+    $earliestLotStockBefore = (int)$earliestLot['cantidad_actual'];
+
+    // Realizar venta de 2 unidades
+    $saleRes = processSale($db, [
+        'cliente_id' => 1,
+        'metodo_pago' => 'EFECTIVO',
+        'tipo_comprobante' => 'BOLETA',
+        'monto_recibido' => 100.0,
+        'items' => [
+            ['producto_id' => $prodId, 'cantidad' => 2]
+        ]
+    ], 'u1');
+
+    check($saleRes['venta_id'] > 0, 'Sale was processed');
+    check(str_starts_with($saleRes['comprobante_numero'], 'B001-'), 'Emitted Boleta series B001');
+
+    $stockAfter = (int)$db->query("SELECT stock_actual FROM productos WHERE id = $prodId")->fetchColumn();
+    check($stockAfter === $stockBefore - 2, 'Total product stock decremented by 2');
+
+    $earliestLotAfter = (int)$db->query("SELECT cantidad_actual FROM lotes WHERE id = {$earliestLot['id']}")->fetchColumn();
+    check($earliestLotAfter === $earliestLotStockBefore - 2, 'Earliest FEFO batch decremented first');
+};
+
+$tests['POS sale voiding restores inventory and records audit trace'] = function () use ($db): void {
+    $p = $db->query("SELECT id, stock_actual FROM productos LIMIT 1")->fetch();
+    $prodId = (int)$p['id'];
+    $stockInitial = (int)$p['stock_actual'];
+
+    $sale = processSale($db, [
+        'cliente_id' => 1,
+        'metodo_pago' => 'EFECTIVO',
+        'tipo_comprobante' => 'BOLETA',
+        'monto_recibido' => 50.0,
+        'items' => [['producto_id' => $prodId, 'cantidad' => 1]]
+    ], 'u1');
+
+    check((int)$db->query("SELECT stock_actual FROM productos WHERE id = $prodId")->fetchColumn() === $stockInitial - 1, 'Stock reduced');
+
+    $voidRes = voidSale($db, $sale['venta_id'], 'Error de digitación en POS', 'u1');
+    check($voidRes['estado'] === 'ANULADA', 'Sale status set to ANULADA');
+
+    $stockRestored = (int)$db->query("SELECT stock_actual FROM productos WHERE id = $prodId")->fetchColumn();
+    check($stockRestored === $stockInitial, 'Product stock completely restored after voiding');
+
+    $auditExists = (int)$db->query("SELECT COUNT(*) FROM activity_logs WHERE action = 'ANULAR_VENTA' AND entity_id = '{$sale['venta_id']}'")->fetchColumn();
+    check($auditExists >= 1, 'Audit log created for voided sale');
+};
+
+$tests['cash register shift opening, arqueo calculation, and closing'] = function () use ($db): void {
+    // Cerrar cualquier turno abierto previo para probar ciclo limpio
+    $db->exec("UPDATE caja_turnos SET estado = 'CERRADO' WHERE estado = 'ABIERTO'");
+
+    $openShift = openShift($db, 200.0, 'u1', 'Apertura de turno de prueba');
+    check($openShift['estado'] === 'ABIERTO', 'Shift is open');
+    check((float)$openShift['monto_apertura'] === 200.0, 'Starting cash is 200.0');
+
+    // Registrar ingreso manual
+    registerCashMovement($db, (int)$openShift['id'], 'INGRESO', 50.0, 'Cambio de billetes', 'u1');
+    // Registrar egreso manual
+    registerCashMovement($db, (int)$openShift['id'], 'EGRESO', 20.0, 'Compra de útiles de limpieza', 'u1');
+
+    // Cerrar turno con arqueo: esperado = 200 + 50 - 20 = 230. Declaramos 230
+    $closedShift = closeShift($db, (int)$openShift['id'], 230.0, 'Cuadre conforme');
+    check($closedShift['estado'] === 'CERRADO', 'Shift is closed');
+    check((float)$closedShift['diferencia'] === 0.0, 'Exact cash balance (diferencia = 0)');
+
+    // Re-abrir turno para que el sistema continúe listo para operar
+    openShift($db, 300.0, 'u1', 'Turno regular botica');
+};
+
+$tests['merchandise purchase reception updates lots and stock'] = function () use ($db): void {
+    $prov = $db->query("SELECT id FROM proveedores LIMIT 1")->fetch();
+    $prod = $db->query("SELECT id, stock_actual FROM productos LIMIT 1")->fetch();
+    $prodId = (int)$prod['id'];
+    $stockBefore = (int)$prod['stock_actual'];
+
+    $compra = registerPurchase($db, [
+        'proveedor_id' => $prov['id'],
+        'tipo_comprobante' => 'FACTURA',
+        'serie_comprobante' => 'F009',
+        'numero_comprobante' => '99881',
+        'fecha_emision' => '2026-10-27',
+        'fecha_recepcion' => '2026-10-27',
+        'items' => [
+            [
+                'producto_id' => $prodId,
+                'numero_lote' => 'LT-TEST-PURCHASE-01',
+                'fecha_vencimiento' => '2027-12-31',
+                'cantidad' => 25,
+                'precio_unitario' => 5.50
+            ]
+        ]
+    ], 'u1');
+
+    check($compra['id'] > 0, 'Purchase record created');
+    $stockAfter = (int)$db->query("SELECT stock_actual FROM productos WHERE id = $prodId")->fetchColumn();
+    check($stockAfter === $stockBefore + 25, 'Product stock incremented by 25 from purchase');
+
+    $loteExists = (int)$db->query("SELECT COUNT(*) FROM lotes WHERE producto_id = $prodId AND numero_lote = 'LT-TEST-PURCHASE-01'")->fetchColumn();
+    check($loteExists === 1, 'New batch lot created in inventory');
+};
+
+$tests['MediZano client handles gateway offline with graceful fallback'] = function (): void {
+    $client = new MediZanoClient('http://127.0.0.1:8090', 0.5);
+    $health = $client->checkHealth();
+    check($health['mode'] === 'LOCAL_STANDALONE' || $health['mode'] === 'ONLINE_INTEGRATED', 'Valid mode response');
+    check(is_bool($health['online']), 'Online flag is boolean');
+
+    $products = $client->fetchRemoteProducts();
+    check(isset($products['source']), 'Graceful fallback source specified');
+    check(is_array($products['items']), 'Items returned as array');
+};
+
 foreach ($tests as $name => $test) {
     $test();
     echo "PASS $name\n";

@@ -38,7 +38,11 @@ class API(unittest.TestCase):
     def test_anonymous_cannot_read_or_write(self):
         c = Client()
         self.assertIsNone(c.call('api/auth.php')[1]['user'])
-        for name in ['dashboard', 'objectives', 'kpis', 'measurements', 'initiatives', 'reports', 'admin', 'activity']:
+        endpoints = [
+            'dashboard', 'objectives', 'kpis', 'measurements', 'initiatives', 'reports', 'admin', 'activity',
+            'pharmacy_dashboard', 'products', 'inventory', 'pos', 'cash_register', 'suppliers', 'customers', 'invoices', 'pharmacy_reports', 'botica_settings'
+        ]
+        for name in endpoints:
             self.assertEqual(c.call('api/'+name+'.php')[0], 401, name)
             self.assertEqual(c.call('api/'+name+'.php', 'POST', {})[0], 401, name)
     def test_csrf_and_methods(self):
@@ -182,5 +186,55 @@ class API(unittest.TestCase):
         current = self.c.call('api/kpis.php?id='+kpi)[1]['kpi']
         self.assertEqual(current['compliance_pct'], 40)
         self.assertEqual(current['measurements'][0]['compliance_pct'], 80)
+
+    def test_pharmacy_pos_workflow_and_fefo(self):
+        # 1. Dashboard Botica
+        status, dash = self.c.call('api/pharmacy_dashboard.php')
+        self.assertEqual(status, 200)
+        self.assertTrue(dash['success'])
+        self.assertIn('ventas_hoy', dash['dashboard'])
+        self.assertIn('inventario', dash['dashboard'])
+        self.assertIn('medizano_integration', dash['dashboard'])
+
+        # 2. Búsqueda POS de medicamentos
+        status, posRes = self.c.call('api/pos.php?action=search_products&q=Paracetamol')
+        self.assertEqual(status, 200)
+        self.assertTrue(posRes['success'])
+        self.assertGreater(len(posRes['products']), 0)
+        prod = posRes['products'][0]
+        self.assertIn('lotes_fefo', prod)
+
+        # 3. Registrar venta POS
+        salePayload = {
+            'cliente_id': 1,
+            'metodo_pago': 'EFECTIVO',
+            'tipo_comprobante': 'BOLETA',
+            'monto_recibido': 50.0,
+            'items': [
+                {'producto_id': prod['id'], 'cantidad': 1, 'precio_unitario': prod['precio_venta']}
+            ]
+        }
+        status, saleRes = self.c.call('api/pos.php?action=create_sale', 'POST', salePayload)
+        self.assertEqual(status, 200, saleRes)
+        self.assertTrue(saleRes['success'])
+        ventaId = saleRes['sale']['venta_id']
+        compNum = saleRes['sale']['comprobante_numero']
+        self.assertTrue(compNum.startswith('B001-'))
+
+        # 4. Detalle de comprobante
+        status, compRes = self.c.call('api/invoices.php?action=detail&id=' + str(saleRes['sale']['comprobante_id']))
+        self.assertEqual(status, 200)
+        self.assertEqual(compRes['invoice']['numero_completo'], compNum)
+
+        # 5. Inventario summary y lotes
+        status, invSum = self.c.call('api/inventory.php?action=summary')
+        self.assertEqual(status, 200)
+        self.assertGreater(invSum['summary']['total_productos'], 0)
+
+        # 6. MediZano Health check endpoint
+        status, medizano = self.c.call('api/botica_settings.php?action=check_medizano')
+        self.assertEqual(status, 200)
+        self.assertIn('medizano', medizano)
+        self.assertIn(medizano['medizano']['mode'], ['LOCAL_STANDALONE', 'ONLINE_INTEGRATED'])
 
 if __name__ == '__main__': unittest.main(verbosity=2)

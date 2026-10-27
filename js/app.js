@@ -1,18 +1,18 @@
 import { createApiClient } from './api.js';
 import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
+import { createBoticaModule } from './botica.js';
 
 /**
- * TECHPERU SAC — BALANCED SCORECARD 2025
+ * TECHPERU SAC — BALANCED SCORECARD 2025 & GESTIÓN INTEGRAL DE BOTICA
  * Frontend conectado a Backend PHP 8.3 & SQLite
- * Soporte completo para Responsables por KPI, Auditoría y Transacciones
+ * Soporte completo para Farmacia, POS, Lotes FEFO, Caja, Facturación y BSC Histórico
  */
 (() => {
   "use strict";
 
-
   let currentUser = null;
   let modalReturnFocus = null;
-  let currentPage = "dashboard";
+  let currentPage = "botica_dashboard";
   let dashboardViewMode = "matriz"; // 'matriz', 'cuadrantes', 'graficos'
   let activeExcelFilter = null;
   let activeStatusFilter = null;
@@ -70,14 +70,25 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   };
 
   const pageTitles = {
-    dashboard: "Dashboard ejecutivo",
-    mapa: "Mapa estratégico",
+    botica_dashboard: "Dashboard de Botica",
+    botica_pos: "Terminal Punto de Venta (POS)",
+    botica_productos: "Medicamentos y Catálogo",
+    botica_lotes: "Control de Lotes y FEFO",
+    botica_kardex: "Kardex de Movimientos",
+    botica_compras: "Compras y Recepción",
+    botica_clientes: "Directorio de Clientes",
+    botica_caja: "Caja y Arqueo de Turno",
+    botica_comprobantes: "Comprobantes Emitidos",
+    botica_reportes: "Reportes de Botica",
+    botica_config: "Configuración y MediZano",
+    dashboard: "Dashboard ejecutivo (BSC)",
+    mapa: "Mapa estratégico (BSC)",
     objetivos: "Objetivos estratégicos",
     kpis: "Indicadores (KPI)",
     mediciones: "Registro de resultados",
     iniciativas: "Iniciativas estratégicas",
-    reportes: "Reportes",
-    administracion: "Configuración"
+    reportes: "Reportes (BSC)",
+    administracion: "Configuración BSC"
   };
 
   // ========================================================
@@ -112,6 +123,9 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     region.append(t);
     setTimeout(() => t.remove(), 3500);
   }
+
+  const botica = createBoticaModule(apiFetch, toast);
+  window.navigateToPage = (p) => navigate(p);
 
   function pageHead(title, subtitle, actionsHtml = "") {
     return `
@@ -312,6 +326,17 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     main.setAttribute("aria-busy", "true");
     try {
     switch (currentPage) {
+      case "botica_dashboard": await botica.renderBoticaDashboard(main); break;
+      case "botica_pos": await botica.renderBoticaPos(main); break;
+      case "botica_productos": await botica.renderBoticaProductos(main); break;
+      case "botica_lotes": await botica.renderBoticaLotes(main); break;
+      case "botica_kardex": await botica.renderBoticaKardex(main); break;
+      case "botica_compras": await botica.renderBoticaCompras(main); break;
+      case "botica_clientes": await botica.renderBoticaClientes(main); break;
+      case "botica_caja": await botica.renderBoticaCaja(main); break;
+      case "botica_comprobantes": await botica.renderBoticaComprobantes(main); break;
+      case "botica_reportes": await botica.renderBoticaReportes(main); break;
+      case "botica_config": await botica.renderBoticaConfig(main); break;
       case "dashboard": await renderDashboard(main); break;
       case "mapa": await renderMap(main); break;
       case "objetivos": await renderObjectives(main); break;
@@ -320,7 +345,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       case "iniciativas": await renderInitiatives(main); break;
       case "reportes": await renderReports(main); break;
       case "administracion": await renderAdmin(main); break;
-      default: await renderDashboard(main); break;
+      default: await botica.renderBoticaDashboard(main); break;
     }
     enhanceContent(main);
     main.dataset.page = currentPage;

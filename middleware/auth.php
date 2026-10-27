@@ -29,3 +29,15 @@ function canRecordMeasurement(array $user, array $kpi): bool
     return in_array($user['role'], ['Administrador', 'Gerente', 'Responsable de indicadores'], true)
         || $user['name'] === $kpi['responsible'];
 }
+
+function requirePharmacyRole(array $allowedRoles): array
+{
+    $user = requireAuth();
+    if ($user['role'] === 'Administrador') {
+        return $user;
+    }
+    if (in_array($user['role'], $allowedRoles, true)) {
+        return $user;
+    }
+    jsonError('No tienes permisos suficientes para realizar esta operación en la botica.', 403);
+}
