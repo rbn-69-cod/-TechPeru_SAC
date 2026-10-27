@@ -57,12 +57,16 @@ function seedDatabase(PDO $pdo): void {
             $stmtPeriod->execute($prd);
         }
 
-        // 5. Cargar Objetivos y KPIs del JSON del Excel con responsables enriquecidos
+        // 5. Cargar Objetivos y KPIs (datos nativos en PHP, 100% independiente de Excel)
+        $officialDataFile = __DIR__ . '/official_data.php';
         $jsonPath = dirname(__DIR__) . '/js/excel_exact_data.json';
-        if (!file_exists($jsonPath)) {
-            throw new Exception("No se encontró el archivo de datos del Excel: $jsonPath");
+        if (file_exists($officialDataFile)) {
+            $data = require $officialDataFile;
+        } elseif (file_exists($jsonPath)) {
+            $data = json_decode(file_get_contents($jsonPath), true);
+        } else {
+            throw new Exception("No se encontraron los datos maestros del BSC.");
         }
-        $data = json_decode(file_get_contents($jsonPath), true);
 
         // Mapeo detallado de Responsables, Áreas y Fórmulas para cada uno de los 36 KPIs
         $metaDetails = [
