@@ -1327,22 +1327,43 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
                 <th>Valor Real</th>
                 <th>% Cumpl.</th>
                 <th>Registrado Por</th>
-                <th>Observaciones</th>
+                <th>Observaciones / Auditoría</th>
+                ${['Administrador', 'Gerente', 'Directivo'].includes(currentUser?.role) ? '<th style="text-align:right">Acción</th>' : ''}
               </tr>
             </thead>
             <tbody>
-              ${mRes.measurements.map(m => `
+              ${mRes.measurements.map(m => {
+                const isCorrected = !!m.corrected_at;
+                return `
                 <tr>
                   <td>${escapeHtml(m.date)}</td>
                   <td><span class="tag">${escapeHtml(m.period)}</span></td>
                   <td><strong>${escapeHtml(m.kpi_name)}</strong></td>
                   <td>${renderRespChip(m.responsible || 'Responsable', m.responsible_area)}</td>
-                  <td><strong class="result-value">${fmt(m.value)} ${escapeHtml(m.kpi_unit)}</strong></td>
+                  <td>
+                    <strong class="result-value">${fmt(m.value)} ${escapeHtml(m.kpi_unit)}</strong>
+                    ${isCorrected ? `<div style="font-size:9px;color:#92400e;margin-top:2px">Ant: ${fmt(m.previous_value)}</div>` : ''}
+                  </td>
                   <td><span class="status ${m.compliance_pct >= 90 ? 'good' : m.compliance_pct >= 75 ? 'warn' : 'bad'}">${fmt(m.compliance_pct)}%</span></td>
                   <td><small>${escapeHtml(m.registered_by)}</small></td>
-                  <td style="max-width:280px;white-space:normal;font-size:10px">${escapeHtml(m.notes || '—')}</td>
+                  <td style="max-width:280px;white-space:normal;font-size:10px">
+                    <div>${escapeHtml(m.notes || '—')}</div>
+                    ${isCorrected ? `
+                      <span class="badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:2px 6px;border-radius:4px;display:inline-block;margin-top:3px" title="Corregido por ${escapeHtml(m.corrected_by || '')} el ${escapeHtml(m.corrected_at || '')}: ${escapeHtml(m.correction_reason || '')}">
+                        ⚠️ Corregido: ${escapeHtml(m.correction_reason || '')}
+                      </span>
+                    ` : ''}
+                  </td>
+                  ${['Administrador', 'Gerente', 'Directivo'].includes(currentUser?.role) ? `
+                    <td style="text-align:right">
+                      <button class="btn" style="font-size:10.5px;padding:3px 7px" data-correct-measure-id="${m.id}" data-kpi-id="${escapeHtml(m.kpi_id)}" data-kpi-name="${escapeHtml(m.kpi_name)}" data-kpi-unit="${escapeHtml(m.kpi_unit)}" data-period="${escapeHtml(m.period)}" data-value="${m.value}" data-notes="${escapeHtml(m.notes || '')}">
+                        ✏️ Corregir
+                      </button>
+                    </td>
+                  ` : ''}
                 </tr>
-              `).join("")}
+              `;
+              }).join("")}
             </tbody>
           </table>
         </div>
@@ -1357,6 +1378,61 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     $('#previousMeasurements').onclick = () => { measurementOffset = Math.max(0, measurementOffset - 30); renderCurrentPage(); };
     $('#nextMeasurements').onclick = () => { measurementOffset += 30; renderCurrentPage(); };
     $("#btnOpenNewMeasure")?.addEventListener("click", () => runAction(() => openMeasurementModal()));
+
+    $$('[data-correct-measure-id]', container).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.correctMeasureId, 10);
+        const kpiName = btn.dataset.kpiName;
+        const kpiUnit = btn.dataset.kpiUnit;
+        const period = btn.dataset.period;
+        const currentVal = btn.dataset.value;
+        const notes = btn.dataset.notes || '';
+
+        const bodyHtml = `
+          <div class="field">
+            <label><strong>Indicador y Período</strong></label>
+            <div style="font-size:13px;font-weight:700;color:#1e3a8a">${escapeHtml(kpiName)}</div>
+            <small class="muted">Período de medición: ${escapeHtml(period)} | Valor actual: ${escapeHtml(currentVal)} ${escapeHtml(kpiUnit)}</small>
+          </div>
+          <div class="field">
+            <label for="corrVal"><strong>Nuevo Valor Real *</strong></label>
+            <input id="corrVal" type="number" step="any" value="${escapeHtml(currentVal)}" required>
+          </div>
+          <div class="field">
+            <label for="corrNotes"><strong>Observaciones / Notas Actualizadas</strong></label>
+            <textarea id="corrNotes" rows="2">${escapeHtml(notes)}</textarea>
+          </div>
+          <div class="field">
+            <label for="corrReason"><strong>Motivo de la Corrección (Obligatorio para auditoría) *</strong></label>
+            <input id="corrReason" type="text" placeholder="Ej. Error de digitación en reporte operativo inicial" required minlength="5">
+            <small class="muted">Esta corrección quedará registrada con tu usuario y fecha en el registro de auditoría de SQLite.</small>
+          </div>
+        `;
+
+        showModal(`Corregir Medición: ${period}`, bodyHtml, "Aplicar Corrección", async () => {
+          const newVal = parseFloat($('#corrVal').value);
+          const newNotes = $('#corrNotes').value.trim();
+          const reason = $('#corrReason').value.trim();
+
+          if (isNaN(newVal)) throw new Error('Ingresa un valor numérico válido.');
+          if (!reason || reason.length < 5) throw new Error('El motivo de la corrección debe tener al menos 5 caracteres.');
+
+          const r = await apiFetch('api/measurements.php?action=correct', {
+            method: 'POST',
+            body: {
+              measurement_id: id,
+              value: newVal,
+              notes: newNotes,
+              reason: reason
+            }
+          });
+          toast(r.message || 'Medición corregida.');
+          closeModal();
+          renderCurrentPage();
+        }, "CORRECCIÓN AUDITADA");
+      });
+    });
+
     $("#directMeasureForm")?.addEventListener("submit", async e => {
       e.preventDefault();
       const button = e.currentTarget.querySelector('button[type="submit"]');
@@ -1992,6 +2068,32 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
                 <button type="submit" class="btn primary" id="btnSaveProfile">💾 Guardar Cambios en Mi Perfil y Foto</button>
               </div>
             </form>
+
+            <div style="margin-top:24px;border-top:1px solid #e2e8f0;padding-top:18px">
+              <div class="panel-head" style="margin-bottom:12px;padding:0">
+                <div>
+                  <h4 style="margin:0;font-size:14px;font-weight:700">Seguridad & Cambio de Contraseña</h4>
+                  <p style="margin:2px 0 0;font-size:12px;color:#64748b">Actualiza la contraseña de tu cuenta de acceso</p>
+                </div>
+              </div>
+              <form id="profileChangePassForm" class="grid" style="gap:12px;max-width:440px">
+                <div class="field">
+                  <label for="profCurrentPass"><strong>Contraseña Actual *</strong></label>
+                  <input id="profCurrentPass" type="password" required placeholder="Tu contraseña actual">
+                </div>
+                <div class="field">
+                  <label for="profNewPass"><strong>Nueva Contraseña *</strong></label>
+                  <input id="profNewPass" type="password" minlength="8" required placeholder="Mínimo 8 caracteres">
+                </div>
+                <div class="field">
+                  <label for="profConfirmPass"><strong>Confirmar Nueva Contraseña *</strong></label>
+                  <input id="profConfirmPass" type="password" minlength="8" required placeholder="Repite la nueva contraseña">
+                </div>
+                <div>
+                  <button type="submit" class="btn">🔑 Actualizar Mi Contraseña</button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </div>
@@ -2014,6 +2116,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
                   <th>Correo Electrónico</th>
                   <th>Rol</th>
                   <th>Área / Cargo</th>
+                  <th>Estado</th>
                   <th>Fecha Registro</th>
                   <th style="text-align:right">Acciones</th>
                 </tr>
@@ -2022,6 +2125,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
                 ${usersRes.users.map(u => {
                   const isCurrent = u.id === currentUser.id;
                   const roleCls = u.role === 'Administrador' ? 'admin' : (u.role.includes('Gerente') || u.role.includes('Directivo') ? 'gerente' : 'responsable');
+                  const isActive = u.is_active !== undefined ? (Number(u.is_active) === 1) : true;
                   return `
                     <tr>
                       <td>
@@ -2038,10 +2142,21 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
                       <td><code>${escapeHtml(u.email)}</code></td>
                       <td><span class="role-badge ${roleCls}">${escapeHtml(u.role)}</span></td>
                       <td>${escapeHtml(u.area)}</td>
+                      <td>
+                        <span class="status ${isActive ? 'good' : 'bad'}" style="font-size:11px">
+                          ${isActive ? '🟢 Activo' : '🔴 Inactivo'}
+                        </span>
+                      </td>
                       <td><small class="muted">${escapeHtml((u.created_at || '').slice(0, 10))}</small></td>
                       <td style="text-align:right;white-space:nowrap">
                         <button class="btn" data-edit-user-id="${escapeHtml(u.id)}" title="Editar usuario y foto">✏️ Editar</button>
-                        ${isCurrent ? '' : `<button class="btn" style="color:#dc2626" data-del-user-id="${escapeHtml(u.id)}" data-del-user-name="${escapeHtml(u.name)}" title="Eliminar usuario">🗑️ Eliminar</button>`}
+                        <button class="btn" data-reset-pass-user-id="${escapeHtml(u.id)}" data-user-name="${escapeHtml(u.name)}" title="Restablecer contraseña">🔑 Clave</button>
+                        ${isCurrent ? '' : `
+                          <button class="btn" data-toggle-user-id="${escapeHtml(u.id)}" title="${isActive ? 'Desactivar usuario' : 'Activar usuario'}" style="color:${isActive ? '#b45309' : '#15803d'}">
+                            ${isActive ? '⏸️ Desactivar' : '▶️ Activar'}
+                          </button>
+                          <button class="btn" style="color:#dc2626" data-del-user-id="${escapeHtml(u.id)}" data-del-user-name="${escapeHtml(u.name)}" title="Eliminar usuario">🗑️</button>
+                        `}
                       </td>
                     </tr>
                   `;
@@ -2089,25 +2204,37 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
                 <h3>Períodos de Evaluación</h3>
                 <p>Ciclos de medición registrados en el BSC</p>
               </div>
+              <button class="btn primary" id="btnNewPeriodModal">＋ Nuevo Período</button>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Período</th>
-                  <th>Nombre</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${periodsRes.periods.map(p => `
+            <div class="table-scroll">
+              <table>
+                <thead>
                   <tr>
-                    <td><span class="code">${escapeHtml(p.id)}</span></td>
-                    <td>${escapeHtml(p.name)}</td>
-                    <td><span class="status ${p.status === 'Activo' ? 'good' : 'neutral'}">${escapeHtml(p.status)}</span></td>
+                    <th>Período</th>
+                    <th>Nombre</th>
+                    <th>Fechas</th>
+                    <th>Estado</th>
+                    <th style="text-align:right">Acciones</th>
                   </tr>
-                `).join("")}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  ${periodsRes.periods.map(p => `
+                    <tr>
+                      <td><span class="code">${escapeHtml(p.id)}</span></td>
+                      <td><strong>${escapeHtml(p.name)}</strong></td>
+                      <td><small class="muted">${escapeHtml(p.start_date || '')} al ${escapeHtml(p.end_date || '')}</small></td>
+                      <td><span class="status ${p.status === 'Activo' ? 'good' : 'neutral'}">${escapeHtml(p.status)}</span></td>
+                      <td style="text-align:right;white-space:nowrap">
+                        <button class="btn" data-edit-period-id="${escapeHtml(p.id)}" title="Editar período">✏️</button>
+                        ${p.status !== 'Activo' ? `
+                          <button class="btn" style="color:#2563eb" data-set-active-period="${escapeHtml(p.id)}" title="Establecer como activo">⭐ Activar</button>
+                        ` : '<span class="tag" style="background:#ecfdf5;color:#065f46">Vigente</span>'}
+                      </td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
 
             <div style="margin-top:20px;border-top:1px solid #e2e8f0;padding-top:16px">
               <div class="space-below info-box">
@@ -2128,6 +2255,18 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
               <h3>Registro de Auditoría en Tiempo Real (Activity Logs)</h3>
               <p>Trazabilidad de cambios, mediciones, perfiles y operaciones en SQLite</p>
             </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <input type="search" id="actSearchInput" placeholder="🔍 Buscar en auditoría..." style="padding:6px 10px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px;width:190px">
+              <select id="actActionFilter" style="padding:6px 10px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px">
+                <option value="">Todas las acciones</option>
+                <option value="MEASURE">Mediciones</option>
+                <option value="USER">Usuarios</option>
+                <option value="PASSWORD">Contraseñas</option>
+                <option value="PERIOD">Períodos</option>
+                <option value="CONFIG">Configuración</option>
+                <option value="SEED">Restauración</option>
+              </select>
+            </div>
           </div>
           <div class="table-scroll">
             <table>
@@ -2140,22 +2279,29 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
                   <th>Detalles de la Operación</th>
                 </tr>
               </thead>
-              <tbody>
-                ${actRes.logs.map(l => `
-                  <tr>
-                    <td><small>${escapeHtml(l.created_at)}</small></td>
-                    <td><strong>${escapeHtml(l.user_name || 'Sistema')}</strong></td>
-                    <td><span class="audit-badge ${l.action.includes('MEASURE') ? 'measure' : l.action.includes('SEED') ? 'seed' : l.action.includes('DELETE') ? 'delete' : 'kpi'}">${escapeHtml(l.action)}</span></td>
-                    <td><span class="tag">${escapeHtml(l.entity_type)} ${escapeHtml(l.entity_id || '')}</span></td>
-                    <td style="max-width:400px;white-space:normal;font-size:11px">${escapeHtml(l.details)}</td>
-                  </tr>
-                `).join("")}
+              <tbody id="activityLogsBody">
+                ${renderActivityLogRows(actRes.logs)}
               </tbody>
             </table>
           </div>
         </div>
       </div>
     `;
+
+    function renderActivityLogRows(logs) {
+      if (!logs || logs.length === 0) {
+        return '<tr><td colspan="5" class="empty" style="text-align:center;padding:24px;color:#64748b">No se encontraron registros de auditoría.</td></tr>';
+      }
+      return logs.map(l => `
+        <tr>
+          <td><small>${escapeHtml(l.created_at)}</small></td>
+          <td><strong>${escapeHtml(l.user_name || 'Sistema')}</strong></td>
+          <td><span class="audit-badge ${l.action.includes('MEASURE') ? 'measure' : l.action.includes('SEED') ? 'seed' : l.action.includes('DELETE') ? 'delete' : 'kpi'}">${escapeHtml(l.action)}</span></td>
+          <td><span class="tag">${escapeHtml(l.entity_type)} ${escapeHtml(l.entity_id || '')}</span></td>
+          <td style="max-width:400px;white-space:normal;font-size:11px">${escapeHtml(l.details)}</td>
+        </tr>
+      `).join("");
+    }
 
     // TAB SWITCHING HANDLER
     const tabBtns = $$('.admin-tab-btn', container);
@@ -2239,6 +2385,36 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       }
     });
 
+    // 1.1 CAMBIO DE CONTRASEÑA PROPIA
+    $('#profileChangePassForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const current_password = $('#profCurrentPass').value;
+      const new_password = $('#profNewPass').value;
+      const confirm_password = $('#profConfirmPass').value;
+      if (!current_password || !new_password || !confirm_password) {
+        toast('Por favor completa todos los campos de contraseña.', 'warn');
+        return;
+      }
+      if (new_password !== confirm_password) {
+        toast('La nueva contraseña y su confirmación no coinciden.', 'bad');
+        return;
+      }
+      if (new_password.length < 8) {
+        toast('La nueva contraseña debe tener al menos 8 caracteres.', 'bad');
+        return;
+      }
+      try {
+        const r = await apiFetch('api/auth.php?action=change_password', {
+          method: 'POST',
+          body: { current_password, new_password, confirm_password }
+        });
+        toast(r.message || 'Contraseña actualizada con éxito.');
+        $('#profileChangePassForm').reset();
+      } catch (err) {
+        toast(err.message || 'Error al cambiar contraseña.', 'bad');
+      }
+    });
+
     // 2. CONFIGURACIÓN BSC FORM
     $('#settingsForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -2257,12 +2433,13 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       }
     });
 
-    // 3. GESTIÓN DE USUARIOS (CREAR / EDITAR / ELIMINAR)
+    // 3. GESTIÓN DE USUARIOS (CREAR / EDITAR / ESTADO / CLAVE / ELIMINAR)
     function openUserModal(userToEdit = null) {
       let modalUserAvatar = userToEdit?.avatar || null;
       const isEdit = !!userToEdit;
       const title = isEdit ? `Editar Usuario: ${userToEdit.name}` : "Registrar Nuevo Usuario";
       const eyebrow = isEdit ? "ACTUALIZAR USUARIO" : "NUEVO USUARIO";
+      const isActive = userToEdit ? (Number(userToEdit.is_active) === 1) : true;
 
       const bodyHtml = `
         <div class="avatar-preview-wrap" style="padding:14px;margin-bottom:14px">
@@ -2302,7 +2479,9 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
             <label for="uRole"><strong>Rol de Acceso *</strong></label>
             <select id="uRole">
               <option value="Responsable" ${userToEdit?.role === 'Responsable' ? 'selected' : ''}>Responsable (Registro y seguimiento de KPIs)</option>
-              <option value="Directivo" ${userToEdit?.role === 'Directivo' || userToEdit?.role === 'Gerente' ? 'selected' : ''}>Directivo / Gerente (Visualización integral)</option>
+              <option value="Responsable de indicadores" ${userToEdit?.role === 'Responsable de indicadores' ? 'selected' : ''}>Responsable de indicadores</option>
+              <option value="Directivo" ${userToEdit?.role === 'Directivo' ? 'selected' : ''}>Directivo (Visualización integral)</option>
+              <option value="Gerente" ${userToEdit?.role === 'Gerente' ? 'selected' : ''}>Gerente (Gestión estratégica y operativa)</option>
               <option value="Administrador" ${userToEdit?.role === 'Administrador' ? 'selected' : ''}>Administrador (Control total del sistema)</option>
             </select>
           </div>
@@ -2312,7 +2491,11 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
           </div>
           <div class="field" style="grid-column: 1 / -1">
             <label for="uPassword"><strong>Contraseña ${isEdit ? '(Opcional, dejar vacío para conservar)' : '*'}</strong></label>
-            <input id="uPassword" type="password" placeholder="${isEdit ? 'Dejar en blanco si no deseas cambiarla' : 'Mínimo 6 caracteres'}" ${isEdit ? '' : 'required'}>
+            <input id="uPassword" type="password" placeholder="${isEdit ? 'Dejar en blanco si no deseas cambiarla' : 'Mínimo 8 caracteres'}" ${isEdit ? '' : 'required'}>
+          </div>
+          <div class="field" style="grid-column: 1 / -1; display:flex; align-items:center; gap:8px; margin-top:4px">
+            <input type="checkbox" id="uIsActive" ${isActive ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer">
+            <label for="uIsActive" style="margin:0;cursor:pointer"><strong>Usuario activo (permite iniciar sesión en el BSC)</strong></label>
           </div>
         </div>
       `;
@@ -2323,12 +2506,13 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
         const role = $('#uRole').value;
         const area = $('#uArea').value.trim();
         const password = $('#uPassword').value;
+        const is_active = $('#uIsActive').checked ? 1 : 0;
 
         if (!name || !email || !area) {
           throw new Error('Completa los campos obligatorios (*).');
         }
-        if (!isEdit && !password) {
-          throw new Error('La contraseña es obligatoria para nuevos usuarios.');
+        if (!isEdit && (!password || password.length < 8)) {
+          throw new Error('La contraseña es obligatoria para nuevos usuarios y debe tener al menos 8 caracteres.');
         }
 
         const payload = {
@@ -2338,6 +2522,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
           role,
           area,
           password,
+          is_active,
           avatar: modalUserAvatar
         };
 
@@ -2394,6 +2579,102 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       });
     }
 
+    // Modal para Restablecer Contraseña desde Admin
+    function openResetPasswordModal(user) {
+      const title = `Restablecer Contraseña: ${user.name}`;
+      const eyebrow = "SEGURIDAD DE USUARIO";
+      const bodyHtml = `
+        <div class="grid" style="gap:14px">
+          <div class="field">
+            <label><strong>Usuario Seleccionado</strong></label>
+            <div style="font-weight:700;color:#1e3a8a;font-size:14px">${escapeHtml(user.name)}</div>
+            <small class="muted">${escapeHtml(user.email)} · Rol: ${escapeHtml(user.role)}</small>
+          </div>
+          <div class="field">
+            <label for="adminNewPass"><strong>Nueva Contraseña *</strong></label>
+            <input id="adminNewPass" type="password" minlength="8" placeholder="Mínimo 8 caracteres" required>
+          </div>
+          <div class="field">
+            <label for="adminConfirmPass"><strong>Confirmar Nueva Contraseña *</strong></label>
+            <input id="adminConfirmPass" type="password" minlength="8" placeholder="Repite la contraseña" required>
+          </div>
+        </div>
+      `;
+      showModal(title, bodyHtml, "Restablecer Contraseña", async () => {
+        const new_password = $('#adminNewPass').value;
+        const confirm_password = $('#adminConfirmPass').value;
+        if (!new_password || !confirm_password) throw new Error('Completa ambos campos.');
+        if (new_password !== confirm_password) throw new Error('Las contraseñas no coinciden.');
+        if (new_password.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres.');
+
+        const r = await apiFetch('api/admin.php?action=reset_password', {
+          method: 'POST',
+          body: { id: user.id, new_password, confirm_password }
+        });
+        toast(r.message || 'Contraseña restablecida exitosamente.');
+        closeModal();
+      }, eyebrow);
+    }
+
+    // Modal para Períodos
+    function openPeriodModal(periodToEdit = null) {
+      const isEdit = !!periodToEdit;
+      const title = isEdit ? `Editar Período: ${periodToEdit.id}` : "Registrar Nuevo Período";
+      const eyebrow = isEdit ? "ACTUALIZAR PERÍODO" : "NUEVO PERÍODO";
+      const bodyHtml = `
+        <div class="grid detail-form-grid" style="gap:14px">
+          <div class="field full-span">
+            <label for="periodId"><strong>Código de Período *</strong></label>
+            <input id="periodId" type="text" value="${escapeHtml(periodToEdit?.id || '')}" ${isEdit ? 'disabled' : 'required'} placeholder="Ej. 2026-Q1 o 2026-S1">
+            <small class="muted">Identificador único del ciclo (sin espacios).</small>
+          </div>
+          <div class="field full-span">
+            <label for="periodName"><strong>Nombre Descriptivo *</strong></label>
+            <input id="periodName" type="text" value="${escapeHtml(periodToEdit?.name || '')}" placeholder="Ej. Primer Trimestre 2026" required>
+          </div>
+          <div class="field">
+            <label for="periodStart"><strong>Fecha de Inicio *</strong></label>
+            <input id="periodStart" type="date" value="${escapeHtml(periodToEdit?.start_date || '')}" required>
+          </div>
+          <div class="field">
+            <label for="periodEnd"><strong>Fecha de Fin *</strong></label>
+            <input id="periodEnd" type="date" value="${escapeHtml(periodToEdit?.end_date || '')}" required>
+          </div>
+          <div class="field full-span">
+            <label for="periodStatus"><strong>Estado Operativo *</strong></label>
+            <select id="periodStatus">
+              <option value="Activo" ${periodToEdit?.status === 'Activo' ? 'selected' : ''}>Activo (Vigente para registro)</option>
+              <option value="Histórico" ${periodToEdit?.status === 'Histórico' || !periodToEdit ? 'selected' : ''}>Histórico (Consultas y archivo)</option>
+              <option value="Cerrado" ${periodToEdit?.status === 'Cerrado' ? 'selected' : ''}>Cerrado (Sin modificaciones)</option>
+            </select>
+          </div>
+        </div>
+      `;
+      showModal(title, bodyHtml, isEdit ? "Actualizar Período" : "Crear Período", async () => {
+        const id = isEdit ? periodToEdit.id : $('#periodId').value.trim();
+        const name = $('#periodName').value.trim();
+        const start_date = $('#periodStart').value;
+        const end_date = $('#periodEnd').value;
+        const status = $('#periodStatus').value;
+
+        if (!id || !name || !start_date || !end_date) {
+          throw new Error('Completa todos los campos obligatorios (*).');
+        }
+        if (end_date < start_date) {
+          throw new Error('La fecha de fin no puede ser anterior a la fecha de inicio.');
+        }
+
+        const year = parseInt(start_date.slice(0, 4), 10) || new Date().getFullYear();
+        const r = await apiFetch('api/admin.php?action=save_period', {
+          method: 'POST',
+          body: { id, name, year, start_date, end_date, status }
+        });
+        toast(r.message || 'Período guardado exitosamente.');
+        closeModal();
+        renderCurrentPage();
+      }, eyebrow);
+    }
+
     $('#btnAdminQuickNewUser')?.addEventListener('click', () => openUserModal(null));
     $('#btnNewUserModal')?.addEventListener('click', () => openUserModal(null));
 
@@ -2402,6 +2683,34 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
         const uid = btn.dataset.editUserId;
         const u = usersRes.users.find(x => x.id === uid);
         if (u) openUserModal(u);
+      });
+    });
+
+    $$('[data-reset-pass-user-id]', container).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const uid = btn.dataset.resetPassUserId;
+        const u = usersRes.users.find(x => x.id === uid);
+        if (u) openResetPasswordModal(u);
+      });
+    });
+
+    $$('[data-toggle-user-id]', container).forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const uid = btn.dataset.toggleUserId;
+        const u = usersRes.users.find(x => x.id === uid);
+        const act = u && Number(u.is_active) === 1 ? 'desactivar' : 'activar';
+        if (confirm(`¿Estás seguro de ${act} el acceso de '${u?.name || 'este usuario'}'?`)) {
+          try {
+            const r = await apiFetch('api/admin.php?action=toggle_user_status', {
+              method: 'POST',
+              body: { id: uid }
+            });
+            toast(r.message);
+            renderCurrentPage();
+          } catch (err) {
+            toast(err.message, 'bad');
+          }
+        }
       });
     });
 
@@ -2423,6 +2732,63 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
         }
       });
     });
+
+    // Períodos handlers
+    $('#btnNewPeriodModal')?.addEventListener('click', () => openPeriodModal(null));
+
+    $$('[data-edit-period-id]', container).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pid = btn.dataset.editPeriodId;
+        const p = periodsRes.periods.find(x => x.id === pid);
+        if (p) openPeriodModal(p);
+      });
+    });
+
+    $$('[data-set-active-period]', container).forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pid = btn.dataset.setActivePeriod;
+        if (confirm(`¿Estás seguro de establecer el período '${pid}' como Activo (Vigente)? Los demás períodos pasarán a estado Histórico.`)) {
+          try {
+            const r = await apiFetch('api/admin.php?action=set_active_period', {
+              method: 'POST',
+              body: { id: pid }
+            });
+            toast(r.message || 'Período activado exitosamente.');
+            renderCurrentPage();
+          } catch (err) {
+            toast(err.message, 'bad');
+          }
+        }
+      });
+    });
+
+    // Auditoría handlers (Buscador y filtro)
+    const actSearchInput = $('#actSearchInput', container);
+    const actActionFilter = $('#actActionFilter', container);
+    const actBody = $('#activityLogsBody', container);
+
+    let actDebounceTimer = null;
+    async function reloadActivityLogs() {
+      const q = actSearchInput?.value.trim() || '';
+      const filter_action = actActionFilter?.value || '';
+      try {
+        const queryParams = new URLSearchParams();
+        if (q) queryParams.set('q', q);
+        if (filter_action) queryParams.set('filter_action', filter_action);
+        const res = await apiFetch(`api/admin.php?action=activity&${queryParams.toString()}`);
+        if (actBody) {
+          actBody.innerHTML = renderActivityLogRows(res.logs || []);
+        }
+      } catch (err) {
+        console.error('Error al filtrar auditoría:', err);
+      }
+    }
+
+    actSearchInput?.addEventListener('input', () => {
+      clearTimeout(actDebounceTimer);
+      actDebounceTimer = setTimeout(reloadActivityLogs, 250);
+    });
+    actActionFilter?.addEventListener('change', reloadActivityLogs);
 
     // 4. RESET DEMO DB
     $("#btnResetDB")?.addEventListener("click", async () => {

@@ -4,11 +4,13 @@ function compliance(float $target, float $value, string $direction): float {
     if ($target <= 0) throw new HttpException('La meta del indicador directo debe ser positiva. Corrige el catálogo antes de medir.', 422);
     return round($value / $target * 100, 1);
 }
-function complianceStatus(float $pct): string {
+function complianceStatus(?float $pct, int $measurementCount = 1): string {
+    if ($measurementCount === 0 || $pct === null) return '⏳ PENDIENTE';
     return $pct >= 90 ? '✅ LOGRADO' : ($pct >= 75 ? '⚠️ EN RIESGO' : '❌ CRÍTICO');
 }
 
-function complianceKey(float $pct): string
+function complianceKey(?float $pct, int $measurementCount = 1): string
 {
+    if ($measurementCount === 0 || $pct === null) return 'pending';
     return $pct >= 90 ? 'good' : ($pct >= 75 ? 'warn' : 'bad');
 }

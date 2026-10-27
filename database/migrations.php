@@ -41,6 +41,36 @@ function migrateDatabaseV3(PDO $pdo): void
     });
 }
 
+function migrateDatabaseV4(PDO $pdo): void
+{
+    $version = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
+    if ($version >= 4) return;
+    atomic($pdo, function () use ($pdo): void {
+        // 1. Estado activo/inactivo de usuarios
+        $colsUsers = array_column($pdo->query("PRAGMA table_info(users)")->fetchAll(), 'name');
+        if (!in_array('is_active', $colsUsers, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1");
+        }
+
+        // 2. Columnas de trazabilidad para correcciones de medición
+        $colsMeas = array_column($pdo->query("PRAGMA table_info(measurements)")->fetchAll(), 'name');
+        if (!in_array('previous_value', $colsMeas, true)) {
+            $pdo->exec("ALTER TABLE measurements ADD COLUMN previous_value REAL DEFAULT NULL");
+        }
+        if (!in_array('corrected_at', $colsMeas, true)) {
+            $pdo->exec("ALTER TABLE measurements ADD COLUMN corrected_at TEXT DEFAULT NULL");
+        }
+        if (!in_array('correction_reason', $colsMeas, true)) {
+            $pdo->exec("ALTER TABLE measurements ADD COLUMN correction_reason TEXT DEFAULT NULL");
+        }
+        if (!in_array('corrected_by', $colsMeas, true)) {
+            $pdo->exec("ALTER TABLE measurements ADD COLUMN corrected_by TEXT DEFAULT NULL");
+        }
+
+        $pdo->exec('PRAGMA user_version = 4');
+    });
+}
+
 function migrateDatabase(PDO $pdo): void
 {
     migrateDatabaseV1($pdo);
@@ -51,4 +81,5 @@ function migrateDatabase(PDO $pdo): void
         });
     }
     migrateDatabaseV3($pdo);
+    migrateDatabaseV4($pdo);
 }

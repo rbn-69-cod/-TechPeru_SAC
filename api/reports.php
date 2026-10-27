@@ -6,15 +6,43 @@ $pdo = getDB();
 $action = $_GET['action'] ?? 'summary';
 
 if ($action === 'export_csv') {
-    $kpis = $pdo->query("
+    $persp = $_GET['perspective'] ?? null;
+    $resp = $_GET['responsible'] ?? null;
+    $status = $_GET['status'] ?? null;
+
+    $sql = "
         SELECT p.name as perspective, o.id as obj_id, o.name as obj_name, k.id as kpi_id, k.name as kpi_name,
                k.responsible, k.responsible_area, k.frequency, k.baseline, k.calculation_formula,
                k.unit, k.target, k.current_real, k.compliance_pct, k.status, k.action_recommended
         FROM kpis k
         JOIN objectives o ON k.objective_id = o.id
         JOIN perspectives p ON k.perspective_id = p.id
-        ORDER BY p.order_num ASC, k.num ASC
-    ")->fetchAll();
+        WHERE 1=1
+    ";
+    $params = [];
+    if ($persp) {
+        $sql .= " AND k.perspective_id = ?";
+        $params[] = $persp;
+    }
+    if ($resp) {
+        $sql .= " AND k.responsible = ?";
+        $params[] = $resp;
+    }
+    $sql .= " ORDER BY p.order_num ASC, k.num ASC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $kpis = $stmt->fetchAll();
+
+    if ($status) {
+        $kpis = array_values(array_filter($kpis, function($k) use ($status) {
+            $pct = (float)$k['compliance_pct'];
+            if ($status === 'good') return $pct >= 90.0;
+            if ($status === 'warn') return $pct >= 75.0 && $pct < 90.0;
+            if ($status === 'bad') return $pct < 75.0;
+            return true;
+        }));
+    }
 
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=Balanced_Scorecard_TechPeru_2025_Oficial.csv');
@@ -71,17 +99,45 @@ if ($action === 'export_csv') {
 }
 
 if ($action === 'print_html') {
-    $kpis = $pdo->query("
+    $persp = $_GET['perspective'] ?? null;
+    $resp = $_GET['responsible'] ?? null;
+    $status = $_GET['status'] ?? null;
+
+    $sql = "
         SELECT p.name as perspective, p.color as perspective_color, o.id as obj_id, o.name as obj_name,
                k.id as kpi_id, k.name as kpi_name, k.responsible, k.responsible_area,
                k.unit, k.target, k.current_real, k.compliance_pct, k.status, k.action_recommended
         FROM kpis k
         JOIN objectives o ON k.objective_id = o.id
         JOIN perspectives p ON k.perspective_id = p.id
-        ORDER BY p.order_num ASC, k.num ASC
-    ")->fetchAll();
+        WHERE 1=1
+    ";
+    $params = [];
+    if ($persp) {
+        $sql .= " AND k.perspective_id = ?";
+        $params[] = $persp;
+    }
+    if ($resp) {
+        $sql .= " AND k.responsible = ?";
+        $params[] = $resp;
+    }
+    $sql .= " ORDER BY p.order_num ASC, k.num ASC";
 
-    $avg = round(array_sum(array_column($kpis, 'compliance_pct')) / max(1, count($kpis)), 1);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $kpis = $stmt->fetchAll();
+
+    if ($status) {
+        $kpis = array_values(array_filter($kpis, function($k) use ($status) {
+            $pct = (float)$k['compliance_pct'];
+            if ($status === 'good') return $pct >= 90.0;
+            if ($status === 'warn') return $pct >= 75.0 && $pct < 90.0;
+            if ($status === 'bad') return $pct < 75.0;
+            return true;
+        }));
+    }
+
+    $avg = count($kpis) > 0 ? round(array_sum(array_column($kpis, 'compliance_pct')) / count($kpis), 1) : 0;
     header('Content-Type: text/html; charset=utf-8');
     require dirname(__DIR__) . '/views/report.php';
     exit;

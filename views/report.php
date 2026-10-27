@@ -48,21 +48,29 @@
           </tr>
         </thead>
         <tbody>
-          <?php foreach ($kpis as $k):
-            $sKey = $k['compliance_pct'] >= 90 ? 'logrado' : ($k['compliance_pct'] >= 75 ? 'riesgo' : 'critico');
-          ?>
+          <?php if (empty($kpis)): ?>
             <tr>
-              <td><strong><?= htmlspecialchars($k['perspective']) ?></strong></td>
-              <td><?= htmlspecialchars($k['obj_id']) ?>: <?= htmlspecialchars($k['obj_name']) ?></td>
-              <td><strong><?= htmlspecialchars($k['kpi_name']) ?></strong></td>
-              <td><?= htmlspecialchars($k['responsible']) ?></td>
-              <td><?= htmlspecialchars($k['responsible_area']) ?></td>
-              <td style="text-align:right"><?= number_format($k['target'], 1) ?> <?= htmlspecialchars($k['unit']) ?></td>
-              <td style="text-align:right"><strong><?= number_format($k['current_real'], 1) ?></strong></td>
-              <td style="text-align:right"><strong><?= number_format($k['compliance_pct'], 1) ?>%</strong></td>
-              <td><span class="badge badge-<?= $sKey ?>"><?= htmlspecialchars($k['status']) ?></span></td>
+              <td colspan="9" style="text-align:center;padding:28px;color:#64748b;font-size:12px">
+                No se encontraron indicadores registrados para los criterios seleccionados.
+              </td>
             </tr>
-          <?php endforeach; ?>
+          <?php else: ?>
+            <?php foreach ($kpis as $k):
+              $sKey = $k['compliance_pct'] >= 90 ? 'logrado' : ($k['compliance_pct'] >= 75 ? 'riesgo' : 'critico');
+            ?>
+              <tr>
+                <td><strong><?= htmlspecialchars($k['perspective']) ?></strong></td>
+                <td><?= htmlspecialchars($k['obj_id']) ?>: <?= htmlspecialchars($k['obj_name']) ?></td>
+                <td><strong><?= htmlspecialchars($k['kpi_name']) ?></strong></td>
+                <td><?= htmlspecialchars($k['responsible']) ?></td>
+                <td><?= htmlspecialchars($k['responsible_area']) ?></td>
+                <td style="text-align:right"><?= number_format($k['target'], 1) ?> <?= htmlspecialchars($k['unit']) ?></td>
+                <td style="text-align:right"><strong><?= number_format($k['current_real'], 1) ?></strong></td>
+                <td style="text-align:right"><strong><?= number_format($k['compliance_pct'], 1) ?>%</strong></td>
+                <td><span class="badge badge-<?= $sKey ?>"><?= htmlspecialchars($k['status']) ?></span></td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
         </tbody>
       </table>
       <div class="signatures">

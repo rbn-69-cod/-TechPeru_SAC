@@ -15,5 +15,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     jsonResponse(['success' => true, 'measurements' => $stmt->fetchAll(), 'total' => $total, 'limit' => $limit, 'offset' => $offset]);
 }
 require_once dirname(__DIR__) . '/services/measurements.php';
+$action = $_GET['action'] ?? 'record';
+
+if ($action === 'correct') {
+    requireCsrf();
+    $result = correctMeasurement($pdo, getJsonInput(), requireAuth());
+    jsonResponse(['success' => true, 'message' => 'Medición corregida exitosamente y registrada en auditoría.'] + $result, 200);
+}
+
 $result = recordMeasurement($pdo, getJsonInput(), requireAuth());
 jsonResponse(['success' => true, 'message' => 'Medición registrada.'] + $result, 201);

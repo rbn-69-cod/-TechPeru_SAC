@@ -1513,6 +1513,9 @@ nav { padding: 0 10px; overflow-y: auto; }
 .kpi-status-badge.good { background: #ecfdf5; color: #15803d; border: 1px solid #bbf7d0; }
 .kpi-status-badge.warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
 .kpi-status-badge.bad { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.kpi-status-badge.pending { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.status.pending { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.status.pending .dot { background: #94a3b8; }
 .action-rec-box {
   max-width: 230px;
   font-size: 11px;

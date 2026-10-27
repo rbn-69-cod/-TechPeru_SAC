@@ -8,7 +8,9 @@ function initializeSchema(PDO $pdo): void {
             role TEXT NOT NULL,
             area TEXT NOT NULL,
             password TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            avatar TEXT DEFAULT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1
         );
 
         CREATE TABLE IF NOT EXISTS perspectives (
@@ -73,6 +75,10 @@ function initializeSchema(PDO $pdo): void {
             compliance_pct REAL NOT NULL,
             notes TEXT,
             registered_by TEXT,
+            previous_value REAL DEFAULT NULL,
+            corrected_at TEXT DEFAULT NULL,
+            correction_reason TEXT DEFAULT NULL,
+            corrected_by TEXT DEFAULT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (kpi_id) REFERENCES kpis(id)
         );

@@ -91,6 +91,80 @@ $tests['legacy plaintext migration retains working credentials'] = function (): 
     check(password_verify('OldPassword', $password), 'Legacy password lost');
     check($legacy->query('SELECT COUNT(*) FROM users')->fetchColumn() === 1, 'Legacy account lost');
 };
+$tests['unmeasured kpis report pending status'] = function (): void {
+    check(complianceStatus(null, 0) === '⏳ PENDIENTE', 'Unmeasured null status');
+    check(complianceStatus(0.0, 0) === '⏳ PENDIENTE', 'Unmeasured zero status');
+    check(complianceKey(null, 0) === 'pending', 'Unmeasured null key');
+    check(complianceKey(0.0, 0) === 'pending', 'Unmeasured zero key');
+    check(complianceStatus(95.0, 1) === '✅ LOGRADO', 'Measured good status');
+    check(complianceStatus(80.0, 1) === '⚠️ EN RIESGO', 'Measured warn status');
+    check(complianceStatus(50.0, 1) === '❌ CRÍTICO', 'Measured bad status');
+};
+$tests['measurement correction records audit and preserves previous value'] = function () use ($db): void {
+    $user = ['id' => 'u1', 'name' => 'Admin Test', 'role' => 'Administrador'];
+    $m = $db->query("SELECT * FROM measurements WHERE kpi_id = 'KPI-01' ORDER BY date DESC LIMIT 1")->fetch();
+    $origVal = (float)$m['value'];
+    $newVal = $origVal + 5.0;
+
+    expectException(fn() => correctMeasurement($db, [
+        'id' => $m['id'],
+        'value' => $newVal,
+        'reason' => 'abc'
+    ], $user), HttpException::class);
+
+    $res = correctMeasurement($db, [
+        'id' => $m['id'],
+        'value' => $newVal,
+        'reason' => 'Corrección por auditoría externa Q3'
+    ], $user);
+
+    check($res['new_value'] === $newVal, 'Value updated');
+    check($res['previous_value'] === $origVal, 'Previous value preserved');
+
+    $updatedM = $db->query("SELECT * FROM measurements WHERE id = {$m['id']}")->fetch();
+    check($updatedM['correction_reason'] === 'Corrección por auditoría externa Q3', 'Reason saved');
+    check($updatedM['corrected_by'] === 'Admin Test', 'User recorded');
+
+    $log = $db->query("SELECT * FROM activity_logs WHERE action = 'MEASUREMENT_CORRECTED' ORDER BY id DESC LIMIT 1")->fetch();
+    check($log !== false, 'Audit log created');
+    check(str_contains($log['details'], 'Corrección por auditoría externa Q3'), 'Audit log contains reason');
+};
+$tests['user activation and last active admin protection'] = function () use ($db): void {
+    $admins = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'Administrador' AND (is_active = 1 OR is_active IS NULL)")->fetchColumn();
+    check($admins >= 1, 'At least one active admin exists');
+
+    $admin = $db->query("SELECT * FROM users WHERE role = 'Administrador' LIMIT 1")->fetch();
+    if ($admins === 1) {
+        expectException(function () use ($db, $admin) {
+            $count = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'Administrador' AND (is_active = 1 OR is_active IS NULL)")->fetchColumn();
+            if ($count <= 1 && ($admin['is_active'] ?? 1) == 1) {
+                throw new HttpException('No se puede desactivar al único Administrador activo del sistema.', 400);
+            }
+        }, HttpException::class);
+    }
+};
+$tests['period management enforces valid dates and single active period'] = function () use ($db): void {
+    $stmt = $db->prepare("INSERT OR REPLACE INTO evaluation_periods (id, name, year, start_date, end_date, status) VALUES (:id, :name, :year, :start, :end, :status)");
+    $stmt->execute([
+        ':id' => '2026-TEST',
+        ':name' => 'Período Test 2026',
+        ':year' => 2026,
+        ':start' => '2026-01-01',
+        ':end' => '2026-03-31',
+        ':status' => 'Histórico'
+    ]);
+
+    $db->beginTransaction();
+    $db->exec("UPDATE evaluation_periods SET status = 'Histórico' WHERE status = 'Activo'");
+    $stmt = $db->prepare("UPDATE evaluation_periods SET status = 'Activo' WHERE id = :id");
+    $stmt->execute([':id' => '2026-TEST']);
+    $db->commit();
+
+    $activeCount = (int)$db->query("SELECT COUNT(*) FROM evaluation_periods WHERE status = 'Activo'")->fetchColumn();
+    check($activeCount === 1, 'Exactly one active period');
+    $activeId = $db->query("SELECT id FROM evaluation_periods WHERE status = 'Activo'")->fetchColumn();
+    check($activeId === '2026-TEST', 'Correct period activated');
+};
 foreach ($tests as $name => $test) {
     $test();
     echo "PASS $name\n";
