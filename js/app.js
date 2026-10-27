@@ -378,10 +378,10 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   function renderBscMatrixTable(allKpis, filter) {
     const list = filter ? allKpis.filter(k => k.perspective_id === filter) : allKpis;
     const persps = [
-      { key: "financiera", label: "💰 PERSPECTIVA FINANCIERA", cellClass: "excel-persp-fin" },
-      { key: "clientes", label: "👥 PERSPECTIVA DE CLIENTES", cellClass: "excel-persp-cli" },
-      { key: "procesos", label: "🔧 PERSPECTIVA DE PROCESOS INTERNOS", cellClass: "excel-persp-proc" },
-      { key: "aprendizaje", label: "📚 PERSPECTIVA DE APRENDIZAJE Y CRECIMIENTO", cellClass: "excel-persp-apr" }
+      { key: "financiera", label: "💰 PERSPECTIVA FINANCIERA", color: "#1f3864" },
+      { key: "clientes", label: "👥 PERSPECTIVA DE CLIENTES", color: "#1e4d2b" },
+      { key: "procesos", label: "🔧 PERSPECTIVA DE PROCESOS INTERNOS", color: "#9a4b08" },
+      { key: "aprendizaje", label: "📚 PERSPECTIVA DE APRENDIZAJE Y CRECIMIENTO", color: "#4a2373" }
     ].filter(p => !filter || p.key === filter);
 
     let rowsHtml = "";
@@ -389,26 +389,50 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       const pKpis = list.filter(k => k.perspective_id === p.key).sort((a, b) => a.objective_id.localeCompare(b.objective_id) || a.num - b.num);
       if (!pKpis.length) return;
 
-      pKpis.forEach((kpi, kIdx) => {
-        const isFirstInPersp = kIdx === 0;
+      const pAvg = (pKpis.reduce((acc, k) => acc + Number(k.compliance_pct), 0) / pKpis.length).toFixed(1);
+
+      // Fila de encabezado completo de la Perspectiva
+      rowsHtml += `
+        <tr class="persp-header-row ${p.key}">
+          <td colspan="8">
+            <div class="persp-header-content">
+              <span>${p.label}</span>
+              <span class="persp-meta">${pKpis.length} Indicadores · Promedio: ${pAvg}%</span>
+            </div>
+          </td>
+        </tr>
+      `;
+
+      pKpis.forEach((kpi) => {
         const objKpis = pKpis.filter(x => x.objective_id === kpi.objective_id);
         const isFirstInObj = objKpis[0].id === kpi.id;
         const statusClass = (kpi.compliance_pct >= 90) ? "good" : (kpi.compliance_pct >= 75) ? "warn" : "bad";
 
         rowsHtml += `
           <tr>
-            ${isFirstInPersp ? `<td class="${p.cellClass}" rowspan="${pKpis.length}"><b>${p.label}</b></td>` : ""}
             ${isFirstInObj ? `<td class="excel-obj-cell" rowspan="${objKpis.length}"><b>${escapeHtml(kpi.objective_full_name)}</b></td>` : ""}
-            <td>
-              <strong>${escapeHtml(kpi.name)}</strong>
-              <div style="margin-top:4px">${renderRespChip(kpi.responsible, kpi.responsible_area)}</div>
+            <td class="excel-td">
+              <strong style="color:#0f2442">${escapeHtml(kpi.id)}: ${escapeHtml(kpi.name)}</strong>
+              <div style="margin-top:5px">${renderRespChip(kpi.responsible, kpi.responsible_area)}</div>
             </td>
-            <td class="text-center">${escapeHtml(kpi.unit)}</td>
-            <td class="excel-bold-num">${fmt(kpi.target)}</td>
-            <td class="excel-blue-num"><button class="text-action" data-action="quick-measure" data-id="${escapeHtml(kpi.id)}" aria-label="Registrar resultado de ${escapeHtml(kpi.name)}">${fmt(kpi.current_real)}</button></td>
-            <td class="excel-bold-num">${fmt(kpi.compliance_pct)}%</td>
-            <td class="excel-status ${statusClass}"><b>${escapeHtml(kpi.status)}</b></td>
-            <td style="font-size:10.5px;max-width:300px;white-space:normal">${escapeHtml(kpi.action_recommended)}</td>
+            <td class="excel-td text-center">${escapeHtml(kpi.unit)}</td>
+            <td class="excel-td excel-bold-num">${fmt(kpi.target)}</td>
+            <td class="excel-td excel-blue-num">
+              <button class="text-action" data-action="quick-measure" data-id="${escapeHtml(kpi.id)}" title="Haz clic para registrar medición" aria-label="Registrar resultado de ${escapeHtml(kpi.name)}">
+                ${fmt(kpi.current_real)} ✎
+              </button>
+            </td>
+            <td class="excel-td excel-bold-num" style="color:${kpi.compliance_pct >= 90 ? '#15803d' : kpi.compliance_pct >= 75 ? '#b45309' : '#b91c1c'}">
+              ${fmt(kpi.compliance_pct)}%
+            </td>
+            <td class="excel-td text-center">
+              <span class="kpi-status-badge ${statusClass}">
+                ${escapeHtml(kpi.status)}
+              </span>
+            </td>
+            <td class="excel-td" style="font-size:11px;max-width:280px;white-space:normal;color:#475569;line-height:1.4">
+              ${escapeHtml(kpi.action_recommended)}
+            </td>
           </tr>
         `;
       });
@@ -417,24 +441,24 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     return `
     <div class="excel-container">
       <div class="excel-title-banner">
-        BALANCED SCORECARD OFICIAL — TechPeru SAC 2025 · Base de Datos SQLite (${list.length} Indicadores)
+        <span>📋 TABLERO OFICIAL DEL BALANCED SCORECARD — TECHPERU SAC 2025</span>
+        <span style="opacity:0.9;font-weight:600;font-size:11px">${list.length} Indicadores en Base de Datos</span>
       </div>
-      <div class="table-help">
-        <span>💡 <strong>Valores en AZUL:</strong> Haz clic en cualquier valor real para registrar una nueva medición en la base de datos SQLite.</span>
-        <span>Regla: ✅ ≥90% | ⚠️ 75-89% | ❌ &lt;75%</span>
+      <div class="table-help" style="padding:10px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:11px">
+        <span>💡 <strong>Valores en AZUL:</strong> Haz clic en el número con ✎ para registrar una nueva medición en SQLite.</span>
+        <span>Regla Semáforo: <b style="color:#15803d">✅ ≥90%</b> | <b style="color:#b45309">⚠️ 75-89%</b> | <b style="color:#b91c1c">❌ &lt;75%</b></span>
       </div>
       <div class="table-scroll">
         <table class="excel-table">
           <thead>
             <tr>
-              <th class="excel-th" style="width:160px">PERSPECTIVA</th>
               <th class="excel-th" style="width:200px">OBJETIVO ESTRATÉGICO</th>
               <th class="excel-th">INDICADOR (KPI) Y RESPONSABLE</th>
               <th class="excel-th" style="width:65px">UNIDAD</th>
               <th class="excel-th" style="width:75px">META</th>
-              <th class="excel-th" style="width:75px">REAL</th>
-              <th class="excel-th" style="width:75px">% CUMPL.</th>
-              <th class="excel-th" style="width:115px">ESTADO</th>
+              <th class="excel-th" style="width:80px">REAL</th>
+              <th class="excel-th" style="width:80px">% CUMPL.</th>
+              <th class="excel-th" style="width:125px">ESTADO</th>
               <th class="excel-th" style="width:280px">ANÁLISIS / ACCIÓN RECOMENDADA</th>
             </tr>
           </thead>
@@ -442,7 +466,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
         </table>
       </div>
       <div class="excel-sheet-tabs">
-        <button class="excel-sheet-tab ${!filter ? 'active' : ''}" data-sheet-filter="">📋 Todas las Perspectivas (36 KPIs)</button>
+        <button class="excel-sheet-tab ${!filter ? 'active' : ''}" data-sheet-filter="">📋 Todo el BSC (36 KPIs)</button>
         <button class="excel-sheet-tab ${filter === 'financiera' ? 'active' : ''}" data-sheet-filter="financiera">💰 Financiera (9)</button>
         <button class="excel-sheet-tab ${filter === 'clientes' ? 'active' : ''}" data-sheet-filter="clientes">👥 Clientes (9)</button>
         <button class="excel-sheet-tab ${filter === 'procesos' ? 'active' : ''}" data-sheet-filter="procesos">🔧 Procesos Internos (9)</button>
