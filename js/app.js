@@ -186,8 +186,10 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
 
   function toggleSidebarCollapse() {
     const sidebar = $('#sidebar');
+    const shell = $('#appView');
     if (!sidebar) return;
     const isCollapsed = sidebar.classList.toggle('collapsed');
+    shell?.classList.toggle('sidebar-collapsed', isCollapsed);
     const btn = $('#sidebarCollapseBtn');
     if (btn) btn.textContent = isCollapsed ? '⇥' : '⇤';
     try { localStorage.setItem('bsc_sidebar_collapsed', isCollapsed ? '1' : '0'); } catch (e) {}
@@ -202,8 +204,9 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
 
     // Apply collapsed sidebar preference on desktop
     try {
-      if (localStorage.getItem('bsc_sidebar_collapsed') === '1' && !matchMedia('(max-width: 800px)').matches) {
+      if (localStorage.getItem('bsc_sidebar_collapsed') === '1' && !matchMedia('(max-width: 900px)').matches) {
         $('#sidebar')?.classList.add('collapsed');
+        $('#appView')?.classList.add('sidebar-collapsed');
         const btn = $('#sidebarCollapseBtn');
         if (btn) btn.textContent = '⇥';
       }
@@ -229,17 +232,18 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   }
 
   function setSidebar(open) {
-    const mobile = matchMedia('(max-width: 800px)').matches;
+    const mobile = matchMedia('(max-width: 900px)').matches;
     const sidebar = $('#sidebar');
+    if (!sidebar) return;
     sidebar.classList.toggle('open', mobile && open);
     sidebar.inert = mobile && !open;
     sidebar.setAttribute('aria-hidden', String(mobile && !open));
-    $('#menuToggle').setAttribute('aria-expanded', String(mobile && open));
-    $('#sidebarBackdrop').classList.toggle('hidden', !mobile || !open);
-    $('.main-column').inert = mobile && open;
+    $('#menuToggle')?.setAttribute('aria-expanded', String(mobile && open));
+    $('#sidebarBackdrop')?.classList.toggle('hidden', !mobile || !open);
+    $('.main-column')?.setAttribute('aria-hidden', String(mobile && open));
     document.body.classList.toggle('sidebar-open', mobile && open);
-    if (mobile && open) $('#sidebarClose').focus();
-    else if (mobile && sidebar.contains(document.activeElement)) $('#menuToggle').focus();
+    if (mobile && open) $('#sidebarClose')?.focus();
+    else if (mobile && sidebar.contains(document.activeElement)) $('#menuToggle')?.focus();
   }
 
   function navigate(page) {
@@ -2534,7 +2538,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     $('#menuToggle').addEventListener('click', () => setSidebar(!$('#sidebar').classList.contains('open')));
     $('#sidebarClose').addEventListener('click', () => setSidebar(false));
     $('#sidebarBackdrop').addEventListener('click', () => setSidebar(false));
-    matchMedia('(max-width: 800px)').addEventListener('change', () => setSidebar(false));
+    matchMedia('(max-width: 900px)').addEventListener('change', () => setSidebar(false));
     setSidebar(false);
 
     // Profile navigation
