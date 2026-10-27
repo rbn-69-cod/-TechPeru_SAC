@@ -225,6 +225,12 @@ function seedDatabase(PDO $pdo): void {
         $stmtSet->execute(['org_name', 'TechPeru SAC']);
         $stmtSet->execute(['org_desc', 'Balanced Scorecard Oficial 2025 · PHP 8.3 & SQLite Enterprise']);
 
+        $pdo->exec("CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+        $pdo->exec("INSERT OR IGNORE INTO system_settings (key, value) VALUES 
+            ('company_name', 'TechPeru SAC'),
+            ('bsc_title', 'Balanced Scorecard 2025'),
+            ('strategic_period', 'Plan Estratégico · 2025')");
+
         // 8. Log de inicio
         logActivity($pdo, 'SEED_DATABASE', 'SYSTEM', 'ALL', 'Base de datos inicializada con 12 objetivos, 36 KPIs y responsables oficiales del Excel TechPeru SAC 2025.', 'u1', 'Sistema');
 

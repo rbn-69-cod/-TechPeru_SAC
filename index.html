@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TechPeru SAC | Balanced Scorecard 2025</title>
-  <link rel="stylesheet" href="css/styles.css?v=2026_6">
+  <link rel="stylesheet" href="css/styles.css?v=2026_8">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
-  <script type="module" src="js/app.js?v=2026_6"></script>
+  <script type="module" src="js/app.js?v=2026_8"></script>
 </head>
 <body>
   <a class="skip-link" href="#pageContent">Saltar al contenido</a>
@@ -61,32 +61,33 @@
     <aside class="sidebar" id="sidebar">
       <div class="brand">
         <span class="brand-mark">T</span>
-        <div>
-          <strong>TechPeru SAC</strong>
-          <small>Balanced Scorecard 2025</small>
+        <div class="brand-info">
+          <strong id="sideBrandTitle">TechPeru SAC</strong>
+          <small id="sideBrandSubtitle">Balanced Scorecard 2025</small>
         </div>
+        <button id="sidebarCollapseBtn" class="icon-btn sidebar-collapse-btn desktop-only" title="Colapsar o expandir menú" aria-label="Colapsar menú">⇤</button>
         <button id="sidebarClose" class="icon-btn mobile-only" aria-label="Cerrar menú">×</button>
       </div>
 
       <div class="org-switch" id="orgSwitchBtn" title="Base de Datos Oficial TechPeru SAC">
         <span class="org-icon">T</span>
-        <div>
-          <strong>TechPeru SAC</strong>
+        <div class="org-info">
+          <strong id="orgSwitchName">TechPeru SAC</strong>
           <small>4 Perspectivas · 12 Objetivos · 36 KPIs</small>
         </div>
       </div>
 
       <nav id="mainNav" aria-label="Navegación principal">
         <div class="nav-label">ESPACIO DE TRABAJO</div>
-        <button class="nav-item active" data-page="dashboard"><span class="nav-icon">▦</span>Dashboard ejecutivo</button>
-        <button class="nav-item" data-page="mapa"><span class="nav-icon">⌘</span>Mapa estratégico</button>
-        <button class="nav-item" data-page="objetivos"><span class="nav-icon">◎</span>Objetivos estratégicos</button>
-        <button class="nav-item" data-page="kpis"><span class="nav-icon">▥</span>Indicadores (KPI)</button>
-        <button class="nav-item" data-page="mediciones"><span class="nav-icon">↗</span>Registro de resultados</button>
-        <button class="nav-item" data-page="iniciativas"><span class="nav-icon">◈</span>Iniciativas estratégicas</button>
+        <button class="nav-item active" data-page="dashboard" title="Dashboard ejecutivo"><span class="nav-icon">▦</span><span class="nav-text">Dashboard ejecutivo</span></button>
+        <button class="nav-item" data-page="mapa" title="Mapa estratégico"><span class="nav-icon">⌘</span><span class="nav-text">Mapa estratégico</span></button>
+        <button class="nav-item" data-page="objetivos" title="Objetivos estratégicos"><span class="nav-icon">◎</span><span class="nav-text">Objetivos estratégicos</span></button>
+        <button class="nav-item" data-page="kpis" title="Indicadores (KPI)"><span class="nav-icon">▥</span><span class="nav-text">Indicadores (KPI)</span></button>
+        <button class="nav-item" data-page="mediciones" title="Registro de resultados"><span class="nav-icon">↗</span><span class="nav-text">Registro de resultados</span></button>
+        <button class="nav-item" data-page="iniciativas" title="Iniciativas estratégicas"><span class="nav-icon">◈</span><span class="nav-text">Iniciativas estratégicas</span></button>
         <div class="nav-label">ANÁLISIS Y CONTROL</div>
-        <button class="nav-item" data-page="reportes"><span class="nav-icon">▤</span>Reportes</button>
-        <button class="nav-item" data-page="administracion"><span class="nav-icon">⚙</span>Administración</button>
+        <button class="nav-item" data-page="reportes" title="Reportes"><span class="nav-icon">▤</span><span class="nav-text">Reportes</span></button>
+        <button class="nav-item" data-page="administracion" title="Administración & Perfil"><span class="nav-icon">⚙</span><span class="nav-text">Administración</span></button>
       </nav>
 
       <div class="sidebar-bottom">
@@ -97,12 +98,13 @@
             <small>Estrategia y seguimiento</small>
           </div>
         </div>
-        <div class="sidebar-user">
-          <div class="avatar" id="sideUserAvatar">AT</div>
-          <div class="user-meta">
+        <div class="sidebar-user" id="sideUserProfileCard">
+          <div class="avatar" id="sideUserAvatar" title="Haz clic para ver y editar tu foto">AT</div>
+          <div class="user-meta" id="sideUserMeta" title="Haz clic para ver y editar tu foto">
             <strong id="sideUserName">Administrador TechPeru</strong>
             <small id="sideUserRole">Administrador</small>
           </div>
+          <button id="sideEditProfileBtn" class="logout" title="Editar perfil y cambiar foto" aria-label="Editar perfil">✏️</button>
           <button id="logoutBtn" aria-label="Cerrar sesión" class="logout" title="Cerrar sesión">↪</button>
         </div>
       </div>
@@ -115,16 +117,16 @@
       <header class="topbar">
         <button id="menuToggle" aria-controls="sidebar" aria-expanded="false" class="icon-btn mobile-only" aria-label="Abrir menú">☰</button>
         <div class="breadcrumb">
-          <span>TechPeru SAC</span>
+          <span id="breadcrumbOrg">TechPeru SAC</span>
           <span class="crumb-sep">/</span>
           <strong id="breadcrumbPage">Dashboard ejecutivo</strong>
         </div>
         <div class="top-actions">
-          <span class="period-select" title="Plan estratégico de referencia">Plan estratégico · 2025</span>
+          <span class="period-select" id="topPeriodTag" title="Plan estratégico de referencia">Plan estratégico · 2025</span>
           <button id="notificationsBtn" aria-label="Ver alertas de indicadores" class="icon-btn notification-btn" title="Alertas de KPIs Críticos">
             ♧<i id="notificationDot"></i>
           </button>
-          <div class="top-profile">
+          <div class="top-profile" id="topProfileBtn" title="Haz clic para gestionar tu perfil y cambiar foto">
             <div class="avatar small-avatar" id="topUserAvatar">AT</div>
             <div>
               <strong id="topUserName">Administrador TechPeru</strong>

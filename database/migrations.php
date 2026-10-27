@@ -23,12 +23,32 @@ function migrateDatabaseV1(PDO $pdo): void {
     } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
 }
 
+function migrateDatabaseV3(PDO $pdo): void
+{
+    $version = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
+    if ($version >= 3) return;
+    atomic($pdo, function () use ($pdo): void {
+        $cols = array_column($pdo->query("PRAGMA table_info(users)")->fetchAll(), 'name');
+        if (!in_array('avatar', $cols, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT NULL");
+        }
+        $pdo->exec("CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+        $pdo->exec("INSERT OR IGNORE INTO system_settings (key, value) VALUES 
+            ('company_name', 'TechPeru SAC'),
+            ('bsc_title', 'Balanced Scorecard 2025'),
+            ('strategic_period', 'Plan Estratégico · 2025')");
+        $pdo->exec('PRAGMA user_version = 3');
+    });
+}
+
 function migrateDatabase(PDO $pdo): void
 {
     migrateDatabaseV1($pdo);
-    if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() >= 2) return;
-    atomic($pdo, function () use ($pdo): void {
-        $pdo->exec(file_get_contents(__DIR__ . '/migrations/002_integrity.up.sql'));
-        $pdo->exec('PRAGMA user_version = 2');
-    });
+    if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 2) {
+        atomic($pdo, function () use ($pdo): void {
+            $pdo->exec(file_get_contents(__DIR__ . '/migrations/002_integrity.up.sql'));
+            $pdo->exec('PRAGMA user_version = 2');
+        });
+    }
+    migrateDatabaseV3($pdo);
 }

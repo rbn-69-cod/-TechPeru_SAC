@@ -46,7 +46,7 @@ $tests['migration rollback preserves every business row'] = function () use ($db
     atomic($db, fn() => $db->exec(file_get_contents(__DIR__ . '/../database/migrations/002_integrity.down.sql')));
     check((int)$db->query('PRAGMA user_version')->fetchColumn() === 1, 'Down version');
     migrateDatabase($db);
-    check((int)$db->query('PRAGMA user_version')->fetchColumn() === 2, 'Up version');
+    check((int)$db->query('PRAGMA user_version')->fetchColumn() >= 2, 'Up version');
     check($before === businessSnapshot($db), 'Migration altered business records');
     check(!$db->query('PRAGMA foreign_key_check')->fetch(), 'Foreign keys');
 };

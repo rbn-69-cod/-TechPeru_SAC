@@ -143,20 +143,77 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     return false;
   }
 
+  function updateUserUI(user) {
+    if (!user) return;
+    const nameEl1 = $("#sideUserName");
+    const nameEl2 = $("#topUserName");
+    const roleEl1 = $("#sideUserRole");
+    const roleEl2 = $("#topUserRole");
+    if (nameEl1) nameEl1.textContent = user.name;
+    if (nameEl2) nameEl2.textContent = user.name;
+    if (roleEl1) roleEl1.textContent = user.role;
+    if (roleEl2) roleEl2.textContent = user.role;
+
+    const sideAv = $("#sideUserAvatar");
+    const topAv = $("#topUserAvatar");
+    if (user.avatar) {
+      if (sideAv) sideAv.innerHTML = `<img src="${escapeHtml(user.avatar)}" class="avatar-img" alt="Foto">`;
+      if (topAv) topAv.innerHTML = `<img src="${escapeHtml(user.avatar)}" class="avatar-img" alt="Foto">`;
+    } else {
+      const initials = getInitials(user.name);
+      if (sideAv) sideAv.textContent = initials;
+      if (topAv) topAv.textContent = initials;
+    }
+  }
+
+  function applySystemSettings(settings) {
+    if (!settings) return;
+    if (settings.company_name) {
+      const b1 = $("#sideBrandTitle");
+      const b2 = $("#breadcrumbOrg");
+      const b3 = $("#orgSwitchName");
+      if (b1) b1.textContent = settings.company_name;
+      if (b2) b2.textContent = settings.company_name;
+      if (b3) b3.textContent = settings.company_name;
+    }
+    if (settings.bsc_title && $("#sideBrandSubtitle")) {
+      $("#sideBrandSubtitle").textContent = settings.bsc_title;
+    }
+    if (settings.strategic_period && $("#topPeriodTag")) {
+      $("#topPeriodTag").textContent = settings.strategic_period;
+    }
+  }
+
+  function toggleSidebarCollapse() {
+    const sidebar = $('#sidebar');
+    if (!sidebar) return;
+    const isCollapsed = sidebar.classList.toggle('collapsed');
+    const btn = $('#sidebarCollapseBtn');
+    if (btn) btn.textContent = isCollapsed ? '⇥' : '⇤';
+    try { localStorage.setItem('bsc_sidebar_collapsed', isCollapsed ? '1' : '0'); } catch (e) {}
+  }
+
   function showApp() {
     $("#loginView").classList.add("hidden");
     $("#appView").classList.remove("hidden");
-    if (currentUser) {
-      $("#sideUserName").textContent = currentUser.name;
-      $("#topUserName").textContent = currentUser.name;
-      $("#sideUserRole").textContent = currentUser.role;
-      $("#topUserRole").textContent = currentUser.role;
-      const initials = getInitials(currentUser.name);
-      $("#sideUserAvatar").textContent = initials;
-      $("#topUserAvatar").textContent = initials;
-    }
+    updateUserUI(currentUser);
     $("[data-page='administracion']").classList.toggle('hidden', currentUser?.role !== 'Administrador');
     if (currentPage === 'administracion' && currentUser?.role !== 'Administrador') currentPage = 'dashboard';
+
+    // Apply collapsed sidebar preference on desktop
+    try {
+      if (localStorage.getItem('bsc_sidebar_collapsed') === '1' && !matchMedia('(max-width: 800px)').matches) {
+        $('#sidebar')?.classList.add('collapsed');
+        const btn = $('#sidebarCollapseBtn');
+        if (btn) btn.textContent = '⇥';
+      }
+    } catch (e) {}
+
+    // Load system settings
+    apiFetch("api/admin.php?action=settings").then(r => {
+      if (r && r.settings) applySystemSettings(r.settings);
+    }).catch(() => {});
+
     navigate(currentPage);
   }
 
@@ -1318,118 +1375,576 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     $$("[data-action='filter-crit']").forEach(b => b.onclick = () => { pendingKpiStatus = "bad"; navigate("kpis"); });
   }
 
-  // 8. ADMINISTRACIÓN
+  // ========================================================
+  // AVATAR PRESETS & HELPERS
+  // ========================================================
+  const AVATAR_PRESETS = [
+    { id: 'pres_1', label: 'Ejecutivo 1', dataUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" fill="#1e3a8a"/><circle cx="50" cy="40" r="20" fill="#fed7aa"/><path d="M22 84c4-18 16-24 28-24s24 6 28 24" fill="#0f172a"/><path d="M42 60l8 12 8-12z" fill="#f8fafc"/><path d="M48 68l2 16 2-16z" fill="#dc2626"/><circle cx="44" cy="38" r="2.5" fill="#1e293b"/><circle cx="56" cy="38" r="2.5" fill="#1e293b"/><path d="M32 30c4-12 32-12 36 0-8-4-28-4-36 0z" fill="#334155"/></svg>') },
+    { id: 'pres_2', label: 'Ejecutiva 2', dataUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" fill="#0d9488"/><circle cx="50" cy="40" r="20" fill="#fed7aa"/><path d="M22 86c3-18 15-24 28-24s25 6 28 24" fill="#134e4a"/><path d="M44 60l6 8 6-8z" fill="#ccfbf1"/><circle cx="44" cy="38" r="2.5" fill="#1e293b"/><circle cx="56" cy="38" r="2.5" fill="#1e293b"/><path d="M28 42c0-20 44-20 44 0 0 14-8 16-8 16s-2-8-6-8c-5 0-6 6-10 6s-5-6-10-6c-4 0-6 8-6 8s-4-6-4-16z" fill="#451a03"/></svg>') },
+    { id: 'pres_3', label: 'Líder TI', dataUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" fill="#2563eb"/><circle cx="50" cy="40" r="20" fill="#fcd34d"/><path d="M20 86c4-19 16-25 30-25s26 6 30 25" fill="#1e293b"/><circle cx="43" cy="38" r="2.5" fill="#1e293b"/><circle cx="57" cy="38" r="2.5" fill="#1e293b"/><path d="M40 37h6v2h-6zm14 0h6v2h-6z" fill="#0284c7"/><path d="M30 32c6-14 34-14 40 0-10-5-30-5-40 0z" fill="#172554"/></svg>') },
+    { id: 'pres_4', label: 'Directora CX', dataUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" fill="#e11d48"/><circle cx="50" cy="40" r="20" fill="#ffedd5"/><path d="M22 86c3-18 15-24 28-24s25 6 28 24" fill="#881337"/><circle cx="44" cy="38" r="2.5" fill="#1e293b"/><circle cx="56" cy="38" r="2.5" fill="#1e293b"/><path d="M28 34c2-18 42-18 44 0 0 12-4 22-8 22s-2-12-8-12-6 8-10 8-6-8-10-8-6 12-8 12c-4 0-2-14 0-22z" fill="#1c1917"/></svg>') },
+    { id: 'pres_5', label: 'Gerente Finanzas', dataUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" fill="#15803d"/><circle cx="50" cy="40" r="20" fill="#fed7aa"/><path d="M20 86c4-18 16-24 30-24s26 6 30 24" fill="#14532d"/><path d="M42 62l8 10 8-10z" fill="#dcfce7"/><path d="M48 70l2 14 2-14z" fill="#166534"/><circle cx="44" cy="38" r="2.5" fill="#1e293b"/><circle cx="56" cy="38" r="2.5" fill="#1e293b"/><path d="M34 28c8-10 24-10 32 0-8-3-24-3-32 0z" fill="#475569"/></svg>') },
+    { id: 'pres_6', label: 'Estratega Operaciones', dataUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" fill="#7c3aed"/><circle cx="50" cy="40" r="20" fill="#fed7aa"/><path d="M20 86c4-18 16-24 30-24s26 6 30 24" fill="#3b0764"/><circle cx="44" cy="38" r="2.5" fill="#1e293b"/><circle cx="56" cy="38" r="2.5" fill="#1e293b"/><path d="M30 34c4-14 36-14 40 0-8-4-32-4-40 0z" fill="#18181b"/></svg>') },
+    { id: 'pres_7', label: 'Consultor Senior', dataUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" fill="#ea580c"/><circle cx="50" cy="40" r="20" fill="#ffedd5"/><path d="M20 86c4-18 16-24 30-24s26 6 30 24" fill="#431407"/><circle cx="44" cy="38" r="2.5" fill="#1e293b"/><circle cx="56" cy="38" r="2.5" fill="#1e293b"/><path d="M32 30c6-10 30-10 36 0-8-3-28-3-36 0z" fill="#94a3b8"/></svg>') },
+    { id: 'pres_8', label: 'Gestión Talento', dataUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" fill="#db2777"/><circle cx="50" cy="40" r="20" fill="#fde68a"/><path d="M22 86c3-18 15-24 28-24s25 6 28 24" fill="#701a75"/><circle cx="44" cy="38" r="2.5" fill="#1e293b"/><circle cx="56" cy="38" r="2.5" fill="#1e293b"/><path d="M26 36c4-20 44-20 48 0 0 14-6 20-10 20s-4-10-8-10-6 6-10 6-4-6-8-6c-4 0-8 6-12 10z" fill="#3b0764"/></svg>') }
+  ];
+
+  function compressImageFile(file, maxWidth = 160, maxHeight = 160, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('El archivo seleccionado no es una imagen válida.'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Formato de imagen no soportado.'));
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const minDim = Math.min(width, height);
+          const sx = (width - minDim) / 2;
+          const sy = (height - minDim) / 2;
+          canvas.width = maxWidth;
+          canvas.height = maxHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, maxWidth, maxHeight);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  let currentAdminTab = 'perfil';
+
+  // 8. ADMINISTRACIÓN (EDITABLE & PERFILES)
   async function renderAdmin(container) {
-    const usersRes = await apiFetch("api/admin.php?action=users");
-    const periodsRes = await apiFetch("api/admin.php?action=periods");
-    const actRes = await apiFetch("api/admin.php?action=activity");
+    const [usersRes, settingsRes, periodsRes, actRes] = await Promise.all([
+      apiFetch("api/admin.php?action=users"),
+      apiFetch("api/admin.php?action=settings"),
+      apiFetch("api/admin.php?action=periods"),
+      apiFetch("api/admin.php?action=activity")
+    ]);
+
+    const settings = settingsRes?.settings || {};
+    let pendingProfileAvatar = currentUser.avatar || null;
 
     container.innerHTML = `
-      ${pageHead("Administración del Sistema", "Gestión de usuarios, períodos, registro de auditoría y base de datos.", "")}
-      <div class="section-grid grid admin-grid">
-        <!-- USUARIOS -->
-        <div class="panel">
-          <div class="panel-head">
-            <div>
-              <h3>Usuarios y Permisos de Acceso</h3>
-              <p>Cuentas registradas en la tabla de usuarios de SQLite</p>
-            </div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Usuario</th>
-                <th>Rol</th>
-                <th>Área</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${usersRes.users.map(u => `
-                <tr>
-                  <td>
-                    <strong>${escapeHtml(u.name)}</strong>
-                    <div style="font-size:10px;color:#64748b">${escapeHtml(u.email)}</div>
-                  </td>
-                  <td><span class="tag">${escapeHtml(u.role)}</span></td>
-                  <td>${escapeHtml(u.area)}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
+      ${pageHead("Administración del Sistema", "Gestión editable de usuarios, fotos de perfil, configuración del BSC y auditoría.", `
+        <div class="head-actions">
+          <button class="btn primary" id="btnAdminQuickNewUser">＋ Registrar Usuario</button>
         </div>
+      `)}
 
-        <!-- PERÍODOS DE EVALUACIÓN Y MANTENIMIENTO -->
-        <div class="panel">
-          <div class="panel-head">
-            <div>
-              <h3>Períodos de Evaluación</h3>
-              <p>Ciclos de medición registrados en el BSC</p>
+      <!-- PESTAÑAS DE NAVEGACIÓN ADMIN -->
+      <div class="admin-tabs-nav" role="tablist">
+        <button class="admin-tab-btn ${currentAdminTab === 'perfil' ? 'active' : ''}" data-tab="perfil" role="tab">👤 Mi Perfil & Cambiar Foto</button>
+        <button class="admin-tab-btn ${currentAdminTab === 'usuarios' ? 'active' : ''}" data-tab="usuarios" role="tab">👥 Directorio de Usuarios (${usersRes.users.length})</button>
+        <button class="admin-tab-btn ${currentAdminTab === 'configuracion' ? 'active' : ''}" data-tab="configuracion" role="tab">⚙️ Configuración BSC & Períodos</button>
+        <button class="admin-tab-btn ${currentAdminTab === 'auditoria' ? 'active' : ''}" data-tab="auditoria" role="tab">📜 Registro de Auditoría (${actRes.logs.length})</button>
+      </div>
+
+      <!-- SECCIÓN 1: MI PERFIL Y FOTO -->
+      <div id="tabContentPerfil" class="${currentAdminTab === 'perfil' ? '' : 'hidden'}">
+        <div class="split-grid grid" style="grid-template-columns: 360px 1fr; gap: 24px; align-items: start;">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Foto de Perfil</h3>
+                <p>Personaliza tu foto o avatar en el sistema</p>
+              </div>
+            </div>
+            <div class="avatar-preview-wrap">
+              <div class="avatar-large-container">
+                <div class="avatar-large" id="profileAvatarBig">
+                  ${pendingProfileAvatar ? `<img src="${escapeHtml(pendingProfileAvatar)}" alt="Foto">` : getInitials(currentUser.name)}
+                </div>
+                <label class="avatar-camera-badge" title="Subir foto desde tu dispositivo">
+                  📷
+                  <input type="file" id="profileFilePicker" accept="image/png,image/jpeg,image/webp" style="display:none">
+                </label>
+              </div>
+              <div class="avatar-actions-row">
+                <button type="button" class="btn" id="btnUploadProfileFile">📁 Subir Foto</button>
+                <button type="button" class="btn" id="btnRemoveProfileFile" style="color:#dc2626">🗑️ Quitar Foto</button>
+              </div>
+              <div class="preset-avatars-label">O selecciona un avatar ejecutivo oficial:</div>
+              <div class="preset-avatars-grid">
+                ${AVATAR_PRESETS.map((p, idx) => `
+                  <button type="button" class="preset-avatar-btn ${pendingProfileAvatar === p.dataUrl ? 'selected' : ''}" data-idx="${idx}" title="${p.label}">
+                    ${p.dataUrl.startsWith('data:image/svg+xml') ? decodeURIComponent(p.dataUrl.replace('data:image/svg+xml;utf8,', '')) : `<img src="${p.dataUrl}">`}
+                  </button>
+                `).join('')}
+              </div>
             </div>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Período</th>
-                <th>Nombre</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${periodsRes.periods.map(p => `
-                <tr>
-                  <td><span class="code">${escapeHtml(p.id)}</span></td>
-                  <td>${escapeHtml(p.name)}</td>
-                  <td><span class="status ${p.status === 'Activo' ? 'good' : 'neutral'}">${escapeHtml(p.status)}</span></td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
 
-          <div style="margin-top:20px;border-top:1px solid #e2e8f0;padding-top:16px">
-            <div class="space-below info-box">
-              <strong>Restaurar Datos Oficiales del Balanced Scorecard:</strong><br>
-              Restaura los 12 objetivos, los 36 KPIs y los responsables oficiales del Balanced Scorecard de TechPeru SAC (2025).
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Datos Personales & Cargo</h3>
+                <p>Información de tu cuenta en TechPeru SAC</p>
+              </div>
             </div>
-            <button class="btn danger full" id="btnResetDB">🔄 Restaurar Base de Datos del BSC (Valores Oficiales 2025)</button>
+            <form id="profileEditForm" class="grid" style="gap:16px">
+              <div class="field">
+                <label for="profNameInput"><strong>Nombre Completo</strong></label>
+                <input id="profNameInput" type="text" value="${escapeHtml(currentUser.name)}" required>
+              </div>
+              <div class="field">
+                <label for="profAreaInput"><strong>Área o Gerencia</strong></label>
+                <input id="profAreaInput" type="text" value="${escapeHtml(currentUser.area || '')}" required>
+              </div>
+              <div class="field">
+                <label><strong>Correo Electrónico (Identificador)</strong></label>
+                <input type="email" value="${escapeHtml(currentUser.email)}" disabled style="background:#f1f5f9;cursor:not-allowed">
+                <small class="muted">El correo electrónico está vinculado a tu cuenta del Balanced Scorecard.</small>
+              </div>
+              <div class="field">
+                <label><strong>Rol de Acceso</strong></label>
+                <div><span class="role-badge admin">🛡️ ${escapeHtml(currentUser.role)}</span></div>
+              </div>
+              <div style="margin-top:8px">
+                <button type="submit" class="btn primary" id="btnSaveProfile">💾 Guardar Cambios en Mi Perfil y Foto</button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
 
-      <!-- AUDITORÍA DE ACTIVIDAD EN TIEMPO REAL -->
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <h3>Registro de Auditoría en Tiempo Real (Activity Logs)</h3>
-            <p>Trazabilidad de cambios, mediciones y operaciones en la base de datos SQLite</p>
+      <!-- SECCIÓN 2: DIRECTORIO DE USUARIOS (CRUD COMPLETO) -->
+      <div id="tabContentUsuarios" class="${currentAdminTab === 'usuarios' ? '' : 'hidden'}">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Directorio de Usuarios y Responsables</h3>
+              <p>Edita usuarios, nombres, fotos de perfil, roles y accesos a indicadores</p>
+            </div>
+            <button class="btn primary" id="btnNewUserModal">＋ Nuevo Usuario</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Usuario / Foto</th>
+                  <th>Correo Electrónico</th>
+                  <th>Rol</th>
+                  <th>Área / Cargo</th>
+                  <th>Fecha Registro</th>
+                  <th style="text-align:right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${usersRes.users.map(u => {
+                  const isCurrent = u.id === currentUser.id;
+                  const roleCls = u.role === 'Administrador' ? 'admin' : (u.role.includes('Gerente') || u.role.includes('Directivo') ? 'gerente' : 'responsable');
+                  return `
+                    <tr>
+                      <td>
+                        <div class="admin-user-cell">
+                          <div class="avatar">
+                            ${u.avatar ? `<img src="${escapeHtml(u.avatar)}" class="avatar-img" alt="Foto">` : getInitials(u.name)}
+                          </div>
+                          <div>
+                            <strong>${escapeHtml(u.name)} ${isCurrent ? '<span style="font-size:10px;color:#2563eb;font-weight:700">(Tú)</span>' : ''}</strong>
+                            <small class="muted">ID: ${escapeHtml(u.id)}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td><code>${escapeHtml(u.email)}</code></td>
+                      <td><span class="role-badge ${roleCls}">${escapeHtml(u.role)}</span></td>
+                      <td>${escapeHtml(u.area)}</td>
+                      <td><small class="muted">${escapeHtml((u.created_at || '').slice(0, 10))}</small></td>
+                      <td style="text-align:right;white-space:nowrap">
+                        <button class="btn" data-edit-user-id="${escapeHtml(u.id)}" title="Editar usuario y foto">✏️ Editar</button>
+                        ${isCurrent ? '' : `<button class="btn" style="color:#dc2626" data-del-user-id="${escapeHtml(u.id)}" data-del-user-name="${escapeHtml(u.name)}" title="Eliminar usuario">🗑️ Eliminar</button>`}
+                      </td>
+                    </tr>
+                  `;
+                }).join("")}
+              </tbody>
+            </table>
           </div>
         </div>
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha y Hora</th>
-                <th>Usuario</th>
-                <th>Acción</th>
-                <th>Entidad</th>
-                <th>Detalles de la Operación</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${actRes.logs.map(l => `
+      </div>
+
+      <!-- SECCIÓN 3: CONFIGURACIÓN BSC & PERÍODOS -->
+      <div id="tabContentConfiguracion" class="${currentAdminTab === 'configuracion' ? '' : 'hidden'}">
+        <div class="section-grid grid admin-grid" style="grid-template-columns: 1fr 1fr; gap: 24px;">
+          <!-- DATOS ORGANIZACIONALES -->
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Datos de la Organización y Título BSC</h3>
+                <p>Personaliza el nombre de la empresa y encabezados del Scorecard</p>
+              </div>
+            </div>
+            <form id="settingsForm" class="grid" style="gap:14px">
+              <div class="field">
+                <label for="setCompName"><strong>Nombre de la Organización</strong></label>
+                <input id="setCompName" type="text" value="${escapeHtml(settings.company_name || 'TechPeru SAC')}" required>
+              </div>
+              <div class="field">
+                <label for="setBscTitle"><strong>Título del Balanced Scorecard</strong></label>
+                <input id="setBscTitle" type="text" value="${escapeHtml(settings.bsc_title || 'Balanced Scorecard 2025')}" required>
+              </div>
+              <div class="field">
+                <label for="setPeriod"><strong>Período Estratégico Visible</strong></label>
+                <input id="setPeriod" type="text" value="${escapeHtml(settings.strategic_period || 'Plan Estratégico · 2025')}" required>
+              </div>
+              <div style="margin-top:10px">
+                <button type="submit" class="btn primary full">💾 Guardar Configuración de la Empresa</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- PERÍODOS Y RESET DEMO -->
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Períodos de Evaluación</h3>
+                <p>Ciclos de medición registrados en el BSC</p>
+              </div>
+            </div>
+            <table>
+              <thead>
                 <tr>
-                  <td><small>${escapeHtml(l.created_at)}</small></td>
-                  <td><strong>${escapeHtml(l.user_name || 'Sistema')}</strong></td>
-                  <td><span class="audit-badge ${l.action.includes('MEASURE') ? 'measure' : l.action.includes('SEED') ? 'seed' : 'kpi'}">${escapeHtml(l.action)}</span></td>
-                  <td><span class="tag">${escapeHtml(l.entity_type)} ${escapeHtml(l.entity_id || '')}</span></td>
-                  <td style="max-width:400px;white-space:normal;font-size:11px">${escapeHtml(l.details)}</td>
+                  <th>Período</th>
+                  <th>Nombre</th>
+                  <th>Estado</th>
                 </tr>
-              `).join("")}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${periodsRes.periods.map(p => `
+                  <tr>
+                    <td><span class="code">${escapeHtml(p.id)}</span></td>
+                    <td>${escapeHtml(p.name)}</td>
+                    <td><span class="status ${p.status === 'Activo' ? 'good' : 'neutral'}">${escapeHtml(p.status)}</span></td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+
+            <div style="margin-top:20px;border-top:1px solid #e2e8f0;padding-top:16px">
+              <div class="space-below info-box">
+                <strong>Restaurar Datos Oficiales del Balanced Scorecard:</strong><br>
+                Restaura los 12 objetivos, los 36 KPIs y los responsables oficiales de TechPeru SAC (2025).
+              </div>
+              <button class="btn danger full" id="btnResetDB">🔄 Restaurar Base de Datos del BSC (Valores Oficiales 2025)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 4: AUDITORÍA -->
+      <div id="tabContentAuditoria" class="${currentAdminTab === 'auditoria' ? '' : 'hidden'}">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Registro de Auditoría en Tiempo Real (Activity Logs)</h3>
+              <p>Trazabilidad de cambios, mediciones, perfiles y operaciones en SQLite</p>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha y Hora</th>
+                  <th>Usuario</th>
+                  <th>Acción</th>
+                  <th>Entidad</th>
+                  <th>Detalles de la Operación</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${actRes.logs.map(l => `
+                  <tr>
+                    <td><small>${escapeHtml(l.created_at)}</small></td>
+                    <td><strong>${escapeHtml(l.user_name || 'Sistema')}</strong></td>
+                    <td><span class="audit-badge ${l.action.includes('MEASURE') ? 'measure' : l.action.includes('SEED') ? 'seed' : l.action.includes('DELETE') ? 'delete' : 'kpi'}">${escapeHtml(l.action)}</span></td>
+                    <td><span class="tag">${escapeHtml(l.entity_type)} ${escapeHtml(l.entity_id || '')}</span></td>
+                    <td style="max-width:400px;white-space:normal;font-size:11px">${escapeHtml(l.details)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     `;
 
+    // TAB SWITCHING HANDLER
+    const tabBtns = $$('.admin-tab-btn', container);
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        currentAdminTab = tab;
+        tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        $('#tabContentPerfil').classList.toggle('hidden', tab !== 'perfil');
+        $('#tabContentUsuarios').classList.toggle('hidden', tab !== 'usuarios');
+        $('#tabContentConfiguracion').classList.toggle('hidden', tab !== 'configuracion');
+        $('#tabContentAuditoria').classList.toggle('hidden', tab !== 'auditoria');
+      });
+    });
+
+    // 1. MI PERFIL & FOTO EVENTS
+    const profileBig = $('#profileAvatarBig');
+    const filePicker = $('#profileFilePicker');
+
+    function updateProfileBigPreview(avatarData) {
+      pendingProfileAvatar = avatarData;
+      if (avatarData) {
+        profileBig.innerHTML = `<img src="${escapeHtml(avatarData)}" alt="Foto">`;
+      } else {
+        profileBig.textContent = getInitials(currentUser.name);
+      }
+      $$('.preset-avatar-btn', container).forEach(b => {
+        const idx = parseInt(b.dataset.idx, 10);
+        b.classList.toggle('selected', AVATAR_PRESETS[idx]?.dataUrl === avatarData);
+      });
+    }
+
+    $('#btnUploadProfileFile')?.addEventListener('click', () => filePicker?.click());
+    filePicker?.addEventListener('change', async () => {
+      const file = filePicker.files?.[0];
+      if (!file) return;
+      try {
+        const compressed = await compressImageFile(file, 160, 160, 0.88);
+        updateProfileBigPreview(compressed);
+        toast("Foto cargada. Haz clic en 'Guardar Cambios' para confirmar.");
+      } catch (err) {
+        toast(err.message, 'bad');
+      }
+    });
+
+    $('#btnRemoveProfileFile')?.addEventListener('click', () => {
+      updateProfileBigPreview(null);
+      toast("Foto removida. Haz clic en 'Guardar Cambios' para confirmar.");
+    });
+
+    $$('.preset-avatar-btn', container).forEach(b => {
+      b.addEventListener('click', () => {
+        const idx = parseInt(b.dataset.idx, 10);
+        const preset = AVATAR_PRESETS[idx];
+        if (preset) {
+          updateProfileBigPreview(preset.dataUrl);
+          toast(`Avatar '${preset.label}' seleccionado.`);
+        }
+      });
+    });
+
+    $('#profileEditForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = $('#profNameInput').value.trim();
+      const area = $('#profAreaInput').value.trim();
+      if (!name || !area) {
+        toast('Por favor completa tu nombre y área.', 'warn');
+        return;
+      }
+      try {
+        const r = await apiFetch('api/admin.php?action=update_profile', {
+          method: 'POST',
+          body: { name, area, avatar: pendingProfileAvatar }
+        });
+        currentUser = r.user;
+        updateUserUI(currentUser);
+        toast(r.message || 'Perfil y foto actualizados exitosamente.');
+        renderCurrentPage();
+      } catch (err) {
+        toast(err.message || 'Error al actualizar perfil.', 'bad');
+      }
+    });
+
+    // 2. CONFIGURACIÓN BSC FORM
+    $('#settingsForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const company_name = $('#setCompName').value.trim();
+      const bsc_title = $('#setBscTitle').value.trim();
+      const strategic_period = $('#setPeriod').value.trim();
+      try {
+        const r = await apiFetch('api/admin.php?action=save_settings', {
+          method: 'POST',
+          body: { company_name, bsc_title, strategic_period }
+        });
+        applySystemSettings({ company_name, bsc_title, strategic_period });
+        toast(r.message || 'Configuración guardada.');
+      } catch (err) {
+        toast(err.message || 'Error al guardar configuración.', 'bad');
+      }
+    });
+
+    // 3. GESTIÓN DE USUARIOS (CREAR / EDITAR / ELIMINAR)
+    function openUserModal(userToEdit = null) {
+      let modalUserAvatar = userToEdit?.avatar || null;
+      const isEdit = !!userToEdit;
+      const title = isEdit ? `Editar Usuario: ${userToEdit.name}` : "Registrar Nuevo Usuario";
+      const eyebrow = isEdit ? "ACTUALIZAR USUARIO" : "NUEVO USUARIO";
+
+      const bodyHtml = `
+        <div class="avatar-preview-wrap" style="padding:14px;margin-bottom:14px">
+          <div class="avatar-large-container" style="width:80px;height:80px">
+            <div class="avatar-large" id="modalUserAvatarPreview" style="width:80px;height:80px;font-size:24px">
+              ${modalUserAvatar ? `<img src="${escapeHtml(modalUserAvatar)}" alt="Foto">` : (isEdit ? getInitials(userToEdit.name) : '👤')}
+            </div>
+            <label class="avatar-camera-badge" style="width:28px;height:28px;font-size:13px" title="Subir foto">
+              📷
+              <input type="file" id="modalUserFileInput" accept="image/png,image/jpeg,image/webp" style="display:none">
+            </label>
+          </div>
+          <div class="avatar-actions-row">
+            <button type="button" class="btn" id="btnModalUploadFile" style="font-size:10.5px;padding:6px 10px">📁 Subir Foto</button>
+            <button type="button" class="btn" id="btnModalRemoveFile" style="font-size:10.5px;padding:6px 10px;color:#dc2626">🗑️ Quitar</button>
+          </div>
+          <div class="preset-avatars-label" style="font-size:10px">O elegir avatar:</div>
+          <div class="preset-avatars-grid" style="gap:6px">
+            ${AVATAR_PRESETS.map((p, idx) => `
+              <button type="button" class="preset-avatar-btn modal-preset-btn ${modalUserAvatar === p.dataUrl ? 'selected' : ''}" data-idx="${idx}" style="width:36px;height:36px">
+                ${p.dataUrl.startsWith('data:image/svg+xml') ? decodeURIComponent(p.dataUrl.replace('data:image/svg+xml;utf8,', '')) : `<img src="${p.dataUrl}">`}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="grid detail-form-grid">
+          <div class="field">
+            <label for="uName"><strong>Nombre Completo *</strong></label>
+            <input id="uName" type="text" value="${escapeHtml(userToEdit?.name || '')}" placeholder="Ej. Lic. Carlos Mendoza" required>
+          </div>
+          <div class="field">
+            <label for="uEmail"><strong>Correo Electrónico *</strong></label>
+            <input id="uEmail" type="email" value="${escapeHtml(userToEdit?.email || '')}" placeholder="nombre@techperu.pe" required>
+          </div>
+          <div class="field">
+            <label for="uRole"><strong>Rol de Acceso *</strong></label>
+            <select id="uRole">
+              <option value="Responsable" ${userToEdit?.role === 'Responsable' ? 'selected' : ''}>Responsable (Registro y seguimiento de KPIs)</option>
+              <option value="Directivo" ${userToEdit?.role === 'Directivo' || userToEdit?.role === 'Gerente' ? 'selected' : ''}>Directivo / Gerente (Visualización integral)</option>
+              <option value="Administrador" ${userToEdit?.role === 'Administrador' ? 'selected' : ''}>Administrador (Control total del sistema)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="uArea"><strong>Área o Gerencia *</strong></label>
+            <input id="uArea" type="text" value="${escapeHtml(userToEdit?.area || '')}" placeholder="Ej. Gerencia de Finanzas" required>
+          </div>
+          <div class="field" style="grid-column: 1 / -1">
+            <label for="uPassword"><strong>Contraseña ${isEdit ? '(Opcional, dejar vacío para conservar)' : '*'}</strong></label>
+            <input id="uPassword" type="password" placeholder="${isEdit ? 'Dejar en blanco si no deseas cambiarla' : 'Mínimo 6 caracteres'}" ${isEdit ? '' : 'required'}>
+          </div>
+        </div>
+      `;
+
+      showModal(title, bodyHtml, isEdit ? "Actualizar Usuario" : "Crear Usuario", async () => {
+        const name = $('#uName').value.trim();
+        const email = $('#uEmail').value.trim();
+        const role = $('#uRole').value;
+        const area = $('#uArea').value.trim();
+        const password = $('#uPassword').value;
+
+        if (!name || !email || !area) {
+          throw new Error('Completa los campos obligatorios (*).');
+        }
+        if (!isEdit && !password) {
+          throw new Error('La contraseña es obligatoria para nuevos usuarios.');
+        }
+
+        const payload = {
+          id: userToEdit ? userToEdit.id : '',
+          name,
+          email,
+          role,
+          area,
+          password,
+          avatar: modalUserAvatar
+        };
+
+        const res = await apiFetch('api/admin.php?action=save_user', {
+          method: 'POST',
+          body: payload
+        });
+        toast(res.message);
+        if (isEdit && userToEdit.id === currentUser.id) {
+          currentUser.name = name;
+          currentUser.email = email;
+          currentUser.role = role;
+          currentUser.area = area;
+          currentUser.avatar = modalUserAvatar;
+          updateUserUI(currentUser);
+        }
+        closeModal();
+        renderCurrentPage();
+      }, eyebrow);
+
+      // Modal Avatar handlers
+      const modalAvatarBig = $('#modalUserAvatarPreview');
+      const modalPicker = $('#modalUserFileInput');
+      function setModalAvatar(data) {
+        modalUserAvatar = data;
+        if (data) {
+          modalAvatarBig.innerHTML = `<img src="${escapeHtml(data)}" alt="Foto">`;
+        } else {
+          modalAvatarBig.textContent = '👤';
+        }
+        $$('.modal-preset-btn').forEach(b => {
+          const idx = parseInt(b.dataset.idx, 10);
+          b.classList.toggle('selected', AVATAR_PRESETS[idx]?.dataUrl === data);
+        });
+      }
+
+      $('#btnModalUploadFile')?.addEventListener('click', () => modalPicker?.click());
+      modalPicker?.addEventListener('change', async () => {
+        const file = modalPicker.files?.[0];
+        if (!file) return;
+        try {
+          const comp = await compressImageFile(file, 160, 160, 0.88);
+          setModalAvatar(comp);
+        } catch (e) {
+          toast(e.message, 'bad');
+        }
+      });
+      $('#btnModalRemoveFile')?.addEventListener('click', () => setModalAvatar(null));
+      $$('.modal-preset-btn').forEach(b => {
+        b.addEventListener('click', () => {
+          const idx = parseInt(b.dataset.idx, 10);
+          if (AVATAR_PRESETS[idx]) setModalAvatar(AVATAR_PRESETS[idx].dataUrl);
+        });
+      });
+    }
+
+    $('#btnAdminQuickNewUser')?.addEventListener('click', () => openUserModal(null));
+    $('#btnNewUserModal')?.addEventListener('click', () => openUserModal(null));
+
+    $$('[data-edit-user-id]', container).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const uid = btn.dataset.editUserId;
+        const u = usersRes.users.find(x => x.id === uid);
+        if (u) openUserModal(u);
+      });
+    });
+
+    $$('[data-del-user-id]', container).forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const uid = btn.dataset.delUserId;
+        const uname = btn.dataset.delUserName;
+        if (confirm(`¿Estás seguro de eliminar al usuario '${uname}'? Esta acción no se puede deshacer.`)) {
+          try {
+            const r = await apiFetch('api/admin.php?action=delete_user', {
+              method: 'POST',
+              body: { id: uid }
+            });
+            toast(r.message);
+            renderCurrentPage();
+          } catch (err) {
+            toast(err.message, 'bad');
+          }
+        }
+      });
+    });
+
+    // 4. RESET DEMO DB
     $("#btnResetDB")?.addEventListener("click", async () => {
       if (confirm("¿Estás seguro de restablecer la base de datos a los valores oficiales del Balanced Scorecard de TechPeru SAC 2025?")) {
         try {
@@ -2015,11 +2530,31 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       if (btn) navigate(btn.dataset.page);
     });
 
+    $('#sidebarCollapseBtn')?.addEventListener('click', toggleSidebarCollapse);
     $('#menuToggle').addEventListener('click', () => setSidebar(!$('#sidebar').classList.contains('open')));
     $('#sidebarClose').addEventListener('click', () => setSidebar(false));
     $('#sidebarBackdrop').addEventListener('click', () => setSidebar(false));
     matchMedia('(max-width: 800px)').addEventListener('change', () => setSidebar(false));
     setSidebar(false);
+
+    // Profile navigation
+    function openProfileSection() {
+      if (currentUser?.role === 'Administrador') {
+        currentAdminTab = 'perfil';
+        navigate('administracion');
+      } else {
+        toast('Conectado como: ' + (currentUser?.name || 'Usuario') + ' (' + (currentUser?.role || '') + ')');
+      }
+    }
+    $('#sideUserProfileCard')?.addEventListener('click', (e) => {
+      if (e.target.closest('#logoutBtn')) return;
+      openProfileSection();
+    });
+    $('#sideEditProfileBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openProfileSection();
+    });
+    $('#topProfileBtn')?.addEventListener('click', openProfileSection);
 
     // Modal close
     $("#modalClose")?.addEventListener("click", closeModal);
