@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TechPeru SAC | Balanced Scorecard 2025</title>
-  <link rel="stylesheet" href="css/styles.css?v=2026_9">
+  <link rel="stylesheet" href="css/styles.css?v=2026_10">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
-  <script type="module" src="js/app.js?v=2026_9"></script>
+  <script type="module" src="js/app.js?v=2026_10"></script>
 </head>
 <body>
   <a class="skip-link" href="#pageContent">Saltar al contenido</a>
@@ -56,7 +56,7 @@
   </div>
 
   <!-- APLICACIÓN PRINCIPAL -->
-  <div id="appView" class="app-shell hidden">
+  <div id="appView" class="app-shell app-layout hidden">
     <!-- MENÚ LATERAL -->
     <aside class="sidebar" id="sidebar">
       <div class="brand">
@@ -110,10 +110,8 @@
       </div>
     </aside>
 
-    <button id="sidebarBackdrop" class="sidebar-backdrop hidden" aria-label="Cerrar menú de navegación" tabindex="-1"></button>
-
     <!-- COLUMNA PRINCIPAL -->
-    <div class="main-column">
+    <div class="main-column main-layout">
       <header class="topbar">
         <button id="menuToggle" aria-controls="sidebar" aria-expanded="false" class="icon-btn mobile-only" aria-label="Abrir menú">☰</button>
         <div class="breadcrumb">
@@ -136,7 +134,7 @@
         </div>
       </header>
 
-      <main id="pageContent" tabindex="-1">
+      <main id="pageContent" class="main-content" tabindex="-1">
         <!-- Renderizado dinámico -->
       </main>
 
@@ -146,6 +144,9 @@
       </footer>
     </div>
   </div>
+
+  <!-- BACKDROP PARA MENÚ MÓVIL (FUERA DEL GRID) -->
+  <button id="sidebarBackdrop" class="sidebar-backdrop hidden" aria-label="Cerrar menú de navegación" tabindex="-1"></button>
 
   <!-- MODAL LAYER -->
   <div id="modalLayer" class="modal-layer hidden" role="presentation">
