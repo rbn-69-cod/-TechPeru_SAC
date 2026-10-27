@@ -13,7 +13,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   let currentUser = null;
   let modalReturnFocus = null;
   let currentPage = "dashboard";
-  let dashboardViewMode = matchMedia("(max-width: 800px)").matches ? "graficos" : "excel"; // 'excel', 'cuadrantes', 'graficos'
+  let dashboardViewMode = "matriz"; // 'matriz', 'cuadrantes', 'graficos'
   let activeExcelFilter = null;
   let activeRespFilter = null;
   let charts = {};
@@ -238,8 +238,8 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     const g = res.global;
 
     let contentHtml = "";
-    if (dashboardViewMode === "excel") {
-      contentHtml = renderExcelTable(res.all_kpis, activeExcelFilter);
+    if (dashboardViewMode === "matriz") {
+      contentHtml = renderBscMatrixTable(res.all_kpis, activeExcelFilter);
     } else if (dashboardViewMode === "cuadrantes") {
       contentHtml = renderQuadrants(res.perspectives);
     } else {
@@ -316,7 +316,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
           <span class="pill-stat warn">⚠️ EN RIESGO: ${g.riesgo} KPIs</span>
           <span class="pill-stat bad">❌ CRÍTICO: ${g.critico} KPIs</span>
           <div class="view-tabs" style="margin-left:12px">
-            <button class="view-tab ${dashboardViewMode === 'excel' ? 'active' : ''}" data-view="excel">📊 Tabla Excel</button>
+            <button class="view-tab ${dashboardViewMode === 'matriz' ? 'active' : ''}" data-view="matriz">📋 Matriz BSC Completa</button>
             <button class="view-tab ${dashboardViewMode === 'cuadrantes' ? 'active' : ''}" data-view="cuadrantes">▦ Cuadrantes BSC</button>
             <button class="view-tab ${dashboardViewMode === 'graficos' ? 'active' : ''}" data-view="graficos">📈 Gráficos</button>
           </div>
@@ -375,7 +375,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     }
   }
 
-  function renderExcelTable(allKpis, filter) {
+  function renderBscMatrixTable(allKpis, filter) {
     const list = filter ? allKpis.filter(k => k.perspective_id === filter) : allKpis;
     const persps = [
       { key: "financiera", label: "💰 PERSPECTIVA FINANCIERA", cellClass: "excel-persp-fin" },
@@ -417,7 +417,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     return `
     <div class="excel-container">
       <div class="excel-title-banner">
-        BALANCED SCORECARD — TechPeru SAC 2025 · ${list.length} indicadores
+        BALANCED SCORECARD OFICIAL — TechPeru SAC 2025 · Base de Datos SQLite (${list.length} Indicadores)
       </div>
       <div class="table-help">
         <span>💡 <strong>Valores en AZUL:</strong> Haz clic en cualquier valor real para registrar una nueva medición en la base de datos SQLite.</span>
@@ -442,11 +442,11 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
         </table>
       </div>
       <div class="excel-sheet-tabs">
-        <button class="excel-sheet-tab ${!filter ? 'active' : ''}" data-sheet-filter="">📊 BSC Completo</button>
-        <button class="excel-sheet-tab ${filter === 'financiera' ? 'active' : ''}" data-sheet-filter="financiera">💰 Financiera</button>
-        <button class="excel-sheet-tab ${filter === 'clientes' ? 'active' : ''}" data-sheet-filter="clientes">👥 Clientes</button>
-        <button class="excel-sheet-tab ${filter === 'procesos' ? 'active' : ''}" data-sheet-filter="procesos">🔧 Procesos</button>
-        <button class="excel-sheet-tab ${filter === 'aprendizaje' ? 'active' : ''}" data-sheet-filter="aprendizaje">📚 Aprendizaje</button>
+        <button class="excel-sheet-tab ${!filter ? 'active' : ''}" data-sheet-filter="">📋 Todas las Perspectivas (36 KPIs)</button>
+        <button class="excel-sheet-tab ${filter === 'financiera' ? 'active' : ''}" data-sheet-filter="financiera">💰 Financiera (9)</button>
+        <button class="excel-sheet-tab ${filter === 'clientes' ? 'active' : ''}" data-sheet-filter="clientes">👥 Clientes (9)</button>
+        <button class="excel-sheet-tab ${filter === 'procesos' ? 'active' : ''}" data-sheet-filter="procesos">🔧 Procesos Internos (9)</button>
+        <button class="excel-sheet-tab ${filter === 'aprendizaje' ? 'active' : ''}" data-sheet-filter="aprendizaje">📚 Aprendizaje y Crecimiento (9)</button>
       </div>
     </div>
     `;
@@ -580,7 +580,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       button.setAttribute('aria-pressed', String(button.dataset.sheetFilter === (activeExcelFilter || '')));
       button.onclick = () => {
         activeExcelFilter = button.dataset.sheetFilter || null;
-        $('#dashboardMainArea').innerHTML = renderExcelTable(currentDashboardData.all_kpis, activeExcelFilter);
+        $('#dashboardMainArea').innerHTML = renderBscMatrixTable(currentDashboardData.all_kpis, activeExcelFilter);
         bindDashboardEvents();
         enhanceContent($('#dashboardMainArea'));
       };
@@ -1233,10 +1233,10 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
 
           <div style="margin-top:20px;border-top:1px solid #e2e8f0;padding-top:16px">
             <div class="space-below info-box">
-              <strong>Restaurar Datos Oficiales del Excel:</strong><br>
-              Vuelve a cargar los 12 objetivos, los 36 KPIs y los responsables oficiales exactos del archivo <code>BSC_TechPeru_Ampliado_2025.XLSX</code>.
+              <strong>Restaurar Datos Oficiales del Balanced Scorecard:</strong><br>
+              Restaura los 12 objetivos, los 36 KPIs y los responsables oficiales del Balanced Scorecard de TechPeru SAC (2025).
             </div>
-            <button class="btn danger full" id="btnResetDB">🔄 Restaurar Base de Datos desde Excel</button>
+            <button class="btn danger full" id="btnResetDB">🔄 Restaurar Base de Datos del BSC (Valores Oficiales 2025)</button>
           </div>
         </div>
       </div>
@@ -1277,7 +1277,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     `;
 
     $("#btnResetDB")?.addEventListener("click", async () => {
-      if (confirm("¿Estás seguro de restablecer la base de datos a los valores oficiales del Excel de TechPeru SAC 2025?")) {
+      if (confirm("¿Estás seguro de restablecer la base de datos a los valores oficiales del Balanced Scorecard de TechPeru SAC 2025?")) {
         try {
           const r = await apiFetch("api/admin.php?action=reset", { method: "POST" });
           toast(r.message);
