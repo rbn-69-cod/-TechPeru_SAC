@@ -11,7 +11,7 @@ class Client:
         request = urllib.request.Request(BASE + '/' + path, data=json.dumps(data).encode() if data is not None else None, headers=headers, method=method)
         try: response = self.http.open(request, timeout=15)
         except urllib.error.HTTPError as error: response = error
-        raw = response.read().decode()
+        raw = response.read().decode('utf-8', errors='replace')
         result = json.loads(raw) if 'application/json' in response.headers.get('Content-Type', '') else raw
         if isinstance(result, dict) and result.get('csrf_token'): self.token = result['csrf_token']
         return response.status, result

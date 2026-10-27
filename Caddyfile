@@ -1,0 +1,15 @@
+{
+    auto_https off
+}
+
+:8080, :18080 {
+    root * .
+    encode zstd gzip
+
+    route {
+        @forbidden path /database/* /storage/* /config/* /helpers/* /middleware/* /repositories/* /services/* /validators/* /.env* /.git* /api/common.php /*.sqlite* /*.sql /*.log
+        respond @forbidden "Not found" 404
+
+        php_server
+    }
+}

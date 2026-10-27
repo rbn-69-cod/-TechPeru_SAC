@@ -1,0 +1,68 @@
+name: TechPeru BSC CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Backend & Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_sqlite, sqlite3, json, mbstring
+          coverage: none
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax Check (PHP Lint)
+        run: |
+          find . -name "*.php" -not -path "*/vendor/*" -exec php -l {} +
+
+      - name: Run PHP Unit & Schema Tests
+        run: |
+          php tests/backend.php
+
+      - name: Prepare Isolated Test Database & Run Integration Tests
+        run: |
+          export TEST_PORT=18080
+          export DB_PATH="/tmp/bsc_ci_test.sqlite"
+          export APP_DEMO=1
+
+          # Initialize isolated database
+          php -r "
+          require 'database/schema.php';
+          require 'database/seed.php';
+          require 'database/migrations.php';
+          require 'repositories/records.php';
+
+          \$pdo = new PDO('sqlite:' . getenv('DB_PATH'));
+          \$pdo->exec('PRAGMA foreign_keys = ON;');
+          initializeSchema(\$pdo);
+          seedDatabase(\$pdo);
+          migrateDatabase(\$pdo);
+          "
+
+          # Start background test server with router
+          php -S 127.0.0.1:${TEST_PORT} router.php &
+          SERVER_PID=$!
+          sleep 2
+
+          # Run Python integration test suite
+          TEST_BASE_URL="http://127.0.0.1:${TEST_PORT}" python3 tests/integration.py
+
+          # Teardown
+          kill $SERVER_PID
+          rm -f "${DB_PATH}"

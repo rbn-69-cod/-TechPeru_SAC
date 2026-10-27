@@ -1,5 +1,7 @@
 <?php
 /** Additive migration: preserves existing data and upgrades legacy plaintext passwords. */
+require_once __DIR__ . '/transaction.php';
+
 function migrateDatabaseV1(PDO $pdo): void {
     $version = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
     if ($version >= 1) return;

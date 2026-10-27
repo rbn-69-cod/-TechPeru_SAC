@@ -7,6 +7,9 @@ node_modules/
 *.sqlite-*
 storage/*
 !storage/.gitkeep
+database/backups/*
+!database/backups/.gitkeep
 .DS_Store
+*.log
 test-results/
 playwright-report/
