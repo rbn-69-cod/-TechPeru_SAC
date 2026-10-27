@@ -2286,3 +2286,4 @@ export function createBoticaModule(apiFetch, toast) {
     renderBoticaConfig
   };
 }
+

@@ -3,75 +3,81 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TechPeru SAC | Balanced Scorecard 2025</title>
-  <link rel="stylesheet" href="css/styles.css?v=2026_14">
+  <title>Botica MediZano | Sistema de Gestión Farmacéutica</title>
+  <link rel="stylesheet" href="css/styles.css?v=2026_15">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
-  <script type="module" src="js/app.js?v=2026_14"></script>
+  <script type="module" src="js/app.js?v=2026_15"></script>
 </head>
 <body>
   <a class="skip-link" href="#pageContent">Saltar al contenido</a>
-  <noscript><p class="empty-state">Activa JavaScript para utilizar el cuadro de mando.</p></noscript>
+  <noscript><p class="empty-state">Activa JavaScript para utilizar el sistema farmacéutico.</p></noscript>
   <!-- PANTALLA DE ACCESO (MÓDULO 1) -->
   <div id="loginView" class="login-wrap">
     <div class="login-card">
       <div class="brand brand-login">
-        <span class="brand-mark">T</span>
+        <span class="brand-mark">M</span>
         <div>
-          <strong>TechPeru SAC</strong>
-          <small>Gestión estratégica</small>
+          <strong>Botica MediZano</strong>
+          <small>Gestión Farmacéutica Integral</small>
         </div>
       </div>
-      <h1>Bienvenido</h1>
-      <p class="muted">Ingresa al Cuadro de Mando Integral oficial de TechPeru SAC (2025).</p>
+      <h1>Bienvenido a MediZano</h1>
+      <p class="muted">Ingresa al sistema oficial de Botica MediZano (Punto de Venta POS, Lotes FEFO y Caja).</p>
 
-      <!-- CUENTA DE PRUEBA ACCESO RÁPIDO -->
+      <!-- CUENTA DE PRUEBA ACCESO RÁPIDO CON SELECTOR DE ROLES MEDIZANO -->
       <div class="demo-user-card" id="demoUserCard">
         <div class="demo-user-head">
-          <span class="demo-user-badge">👤 Usuario de prueba</span>
+          <span class="demo-user-badge">⚕ Cuentas Oficiales MediZano</span>
           <button type="button" id="btnFillDemoUser" class="btn-demo-quick" title="Hacer clic para autocompletar">Autocompletar</button>
         </div>
-        <div class="demo-user-body">
-          <div class="demo-user-field">
-            <span class="demo-label">Usuario:</span>
-            <code class="demo-code">admin@demo.com</code>
-          </div>
-          <div class="demo-user-field">
-            <span class="demo-label">Clave:</span>
-            <code class="demo-code">BSC2026!</code>
+        <div class="demo-user-body" style="flex-direction: column; gap: 8px;">
+          <label style="font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 2px;">Seleccionar Perfil de Usuario:</label>
+          <select id="selDemoRole" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+            <option value="admin" data-email="admin@medizano.pe" data-role="ROLE_ADMIN" data-desc="Control Total: Auditoría, usuarios, POS, lotes y finanzas">admin · Administrador (ROLE_ADMIN)</option>
+            <option value="cajero" data-email="cajero@medizano.pe" data-role="ROLE_CASHIER" data-desc="Caja POS: Venta por código de barras, cobros y tickets">cajero · Caja POS (ROLE_CASHIER)</option>
+            <option value="inventario" data-email="inventario@medizano.pe" data-role="ROLE_STOCK_MONITOR" data-desc="Control de Existencias: Lotes activos y alertas FEFO">inventario · Monitor Stock (ROLE_STOCK_MONITOR)</option>
+            <option value="almacen" data-email="almacen@medizano.pe" data-role="ROLE_STOCK_KEEPER" data-desc="Almacén: Catálogo maestro, compras y ajuste de lotes">almacen · Encargado Almacén (ROLE_STOCK_KEEPER)</option>
+            <option value="soporte" data-email="soporte@medizano.pe" data-role="ROLE_CUSTOMER_SUPPORT" data-desc="Atención al Paciente: Directorio de clientes y recetas">soporte · Atención Paciente (ROLE_CUSTOMER_SUPPORT)</option>
+            <option value="analista" data-email="analista@medizano.pe" data-role="ROLE_ANALYST" data-desc="Finanzas: Reportes consolidados y arqueo de caja">analista · Analista Financiero (ROLE_ANALYST)</option>
+            <option value="gerente" data-email="gerente@medizano.pe" data-role="ROLE_MANAGER" data-desc="Supervisión: Auditoría operativa y anulación de ventas">gerente · Gerente Operaciones (ROLE_MANAGER)</option>
+          </select>
+          <div style="display: flex; gap: 12px; font-size: 12px; margin-top: 4px;">
+            <div><span class="demo-label">Usuario:</span> <code class="demo-code" id="lblDemoUser">admin@medizano.pe</code></div>
+            <div><span class="demo-label">Clave:</span> <code class="demo-code">admin123</code></div>
           </div>
         </div>
         <div class="demo-user-foot">
-          <span>Rol: <b>Administrador General</b> (acceso total a configuración y reportes)</span>
+          <span id="lblDemoDesc">Rol: <b>ROLE_ADMIN</b> — Control Total: Auditoría, usuarios, POS, lotes y finanzas</span>
         </div>
       </div>
 
       <form id="loginForm">
         <label>
-          Usuario / Correo
-          <input id="loginUser" type="email" autocomplete="username" value="admin@demo.com" placeholder="nombre@empresa.com" required>
+          Usuario o Correo
+          <input id="loginUser" type="text" autocomplete="username" value="admin@medizano.pe" placeholder="admin o admin@medizano.pe" required>
         </label>
         <label>
           Contraseña
-          <input id="loginPass" type="password" autocomplete="current-password" value="BSC2026!" required>
+          <input id="loginPass" type="password" autocomplete="current-password" value="admin123" required>
         </label>
         <p role="alert" id="loginError" class="error-text hidden">Credenciales incorrectas.</p>
-        <button class="btn primary full" type="submit">Ingresar al sistema <span>→</span></button>
+        <button class="btn primary full" type="submit">Ingresar a Botica MediZano <span>→</span></button>
       </form>
-      <p class="demo-note">Acceso reservado a tu equipo. Solicita tus credenciales al administrador de la organización.</p>
+      <p class="demo-note">Acceso integrado compatible con https://52.55.128.225. Clave estándar: <b>admin123</b>.</p>
 
-      <small class="muted">Seguimiento estratégico · TechPeru SAC</small>
+      <small class="muted">Botica MediZano · Gestión Farmacéutica Central</small>
     </div>
     <div class="login-art">
       <div class="art-orbit orbit1"></div>
       <div class="art-orbit orbit2"></div>
       <div class="art-content">
-        <span class="eyebrow">ESTRATEGIA · MEDICIÓN · RESULTADOS</span>
-        <h2>Convierte la estrategia<br>en resultados medibles.</h2>
-        <p>Conecta las 4 perspectivas del Balanced Scorecard, los 12 objetivos estratégicos y los 36 indicadores KPI en tiempo real con persistencia en base de datos.</p>
+        <span class="eyebrow">FARMACIA · PUNTO DE VENTA · LOTES FEFO</span>
+        <h2>Gestión farmacéutica moderna<br>y control estricto FEFO.</h2>
+        <p>Terminal POS ágil, rotación automática por caducidad (First Expired, First Out), arqueo de turnos de caja y comprobantes fiscales conectados con MediZano.</p>
         <div class="art-stats">
-          <div><b>4</b><small>Perspectivas</small></div>
-          <div><b>12</b><small>Objetivos</small></div>
-          <div><b>36</b><small>KPIs Oficiales</small></div>
+          <div><b>16</b><small>Medicamentos</small></div>
+          <div><b>24</b><small>Lotes Activos</small></div>
+          <div><b>100%</b><small>FEFO Compliance</small></div>
         </div>
       </div>
     </div>
@@ -82,10 +88,10 @@
     <!-- MENÚ LATERAL -->
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <span class="brand-mark">T</span>
+        <span class="brand-mark">M</span>
         <div class="brand-info">
-          <strong id="sideBrandTitle">TechPeru SAC</strong>
-          <small id="sideBrandSubtitle">Botica & Farmacia Integral</small>
+          <strong id="sideBrandTitle">Botica MediZano</strong>
+          <small id="sideBrandSubtitle">Farmacia & Dispensación</small>
         </div>
         <button id="sidebarCollapseBtn" class="icon-btn sidebar-collapse-btn desktop-only" title="Colapsar o expandir menú" aria-label="Colapsar menú">
           <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>
@@ -95,11 +101,11 @@
         </button>
       </div>
 
-      <div class="org-switch" id="orgSwitchBtn" title="Botica TechPeru SAC — MediZano Microservicios">
+      <div class="org-switch" id="orgSwitchBtn" title="Botica MediZano — Sistema Integral de Farmacia">
         <span class="org-icon">⚕</span>
         <div class="org-info">
-          <strong id="orgSwitchName">Botica TechPeru</strong>
-          <small><span class="online-indicator"></span> Farmacia · POS · Lotes FEFO</small>
+          <strong id="orgSwitchName">Botica MediZano</strong>
+          <small><span class="online-indicator"></span> Punto de Venta POS · Lotes FEFO</small>
         </div>
       </div>
 

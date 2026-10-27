@@ -89,3 +89,4 @@ jsonResponse([
         'medizano_integration' => $medizanoHealth
     ]
 ]);
+

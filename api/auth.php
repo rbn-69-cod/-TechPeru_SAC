@@ -20,8 +20,8 @@ if ($action === 'login') {
     if ($attempt && $attempt['started_at'] > time() - 900 && $attempt['attempts'] >= 10) {
         header('Retry-After: 900'); jsonError('Demasiados intentos. Espera 15 minutos.', 429);
     }
-    $stmt = $pdo->prepare('SELECT * FROM users WHERE LOWER(email) = ?');
-    $stmt->execute([$email]);
+    $stmt = $pdo->prepare('SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(id) = ?');
+    $stmt->execute([$email, $email]);
     $user = $stmt->fetch();
     // Verify a hash for unknown accounts too, avoiding the fast missing-user path.
     $hash = $user['password'] ?? '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';

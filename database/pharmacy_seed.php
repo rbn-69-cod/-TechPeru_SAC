@@ -13,14 +13,14 @@ function seedPharmacyData(PDO $pdo): void {
 
     // 1. Configuraciones iniciales de Botica
     $settings = [
-        ['botica_nombre', 'TechPeru SAC — Botica & Salud', 'Razón social y nombre comercial'],
+        ['botica_nombre', 'Botica MediZano', 'Razón social y nombre comercial'],
         ['botica_ruc', '20601234567', 'RUC fiscal para emisión de comprobantes'],
-        ['botica_direccion', 'Av. República de Panamá 3545, San Isidro, Lima - Perú', 'Dirección fiscal'],
+        ['botica_direccion', 'Av. Primavera 1050, Santiago de Surco, Lima - Perú', 'Dirección fiscal'],
         ['botica_telefono', '+51 1 710-5000', 'Central telefónica de botica'],
-        ['botica_email', 'farmacia@techperu.pe', 'Correo electrónico de contacto'],
+        ['botica_email', 'contacto@medizano.pe', 'Correo electrónico de contacto'],
         ['botica_igv_pct', '18.0', 'Porcentaje de IGV aplicable'],
         ['botica_dias_alerta_vencimiento', '90', 'Días límite para alerta preventiva de vencimiento FEFO'],
-        ['medizano_gateway_url', 'http://127.0.0.1:8090', 'URL del Gateway de microservicios MediZano'],
+        ['medizano_gateway_url', 'https://52.55.128.225', 'URL del Gateway de microservicios MediZano'],
         ['medizano_sync_enabled', '1', 'Habilitar sincronización con MediZano (1=Sí, 0=No)']
     ];
     $stmtSet = $pdo->prepare("INSERT OR REPLACE INTO botica_settings (clave, valor, descripcion) VALUES (?, ?, ?)");
@@ -28,17 +28,21 @@ function seedPharmacyData(PDO $pdo): void {
         $stmtSet->execute($s);
     }
 
-    // 2. Usuarios de Farmacia adicionales (sin tocar los usuarios BSC existentes)
+    // 2. Usuarios Oficiales MediZano (password: admin123)
     $hasMainAdmin = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE id = 'u1'")->fetchColumn() > 0;
     if ($hasMainAdmin) {
-        $hash = password_hash('BSC2026!', PASSWORD_DEFAULT);
-        $pharmUsers = [
-            ['u_farmacia', 'Q.F. Carlos Sánchez', 'farmaceutico@techperu.pe', 'Farmacéutico', 'Farmacia & Dispensación', $hash],
-            ['u_cajero', 'Ana Lucía Torres', 'caja@techperu.pe', 'Cajero', 'Caja & Atención al Cliente', $hash],
-            ['u_inventario', 'Marco Aurelio Gómez', 'inventario@techperu.pe', 'Inventario', 'Almacén & Cadena de Suministro', $hash]
+        $medizanoHash = password_hash('admin123', PASSWORD_DEFAULT);
+        $medizanoUsers = [
+            ['admin', 'Administrador MediZano', 'admin@medizano.pe', 'ROLE_ADMIN', 'Dirección General & TI', $medizanoHash],
+            ['cajero', 'Cajero POS MediZano', 'cajero@medizano.pe', 'ROLE_CASHIER', 'Caja & Facturación', $medizanoHash],
+            ['inventario', 'Monitor de Inventario', 'inventario@medizano.pe', 'ROLE_STOCK_MONITOR', 'Control de Existencias & FEFO', $medizanoHash],
+            ['almacen', 'Encargado de Almacén', 'almacen@medizano.pe', 'ROLE_STOCK_KEEPER', 'Almacén & Catálogo Maestro', $medizanoHash],
+            ['soporte', 'Atención al Paciente', 'soporte@medizano.pe', 'ROLE_CUSTOMER_SUPPORT', 'Atención al Cliente & Recetas', $medizanoHash],
+            ['analista', 'Analista Financiero', 'analista@medizano.pe', 'ROLE_ANALYST', 'Finanzas & Reportes', $medizanoHash],
+            ['gerente', 'Gerente de Operaciones', 'gerente@medizano.pe', 'ROLE_MANAGER', 'Supervisión & Auditoría', $medizanoHash]
         ];
         $stmtUser = $pdo->prepare("INSERT OR IGNORE INTO users (id, name, email, role, area, password, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)");
-        foreach ($pharmUsers as $u) {
+        foreach ($medizanoUsers as $u) {
             $stmtUser->execute([$u[0], $u[1], $u[2], $u[3], $u[4], $u[5]]);
         }
     }

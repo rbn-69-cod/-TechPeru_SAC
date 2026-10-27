@@ -13,12 +13,28 @@ function getCurrentUser(): ?array {
 function requireAuth(): array {
     return getCurrentUser() ?? jsonError('Inicia sesión para continuar.', 401);
 }
+function normalizeRole(string $role): string
+{
+    return match ($role) {
+        'ROLE_ADMIN' => 'Administrador',
+        'ROLE_CASHIER' => 'Cajero',
+        'ROLE_STOCK_MONITOR', 'ROLE_STOCK_KEEPER' => 'Inventario',
+        'ROLE_CUSTOMER_SUPPORT' => 'Consulta',
+        'ROLE_ANALYST', 'ROLE_MANAGER' => 'Gerente',
+        default => $role
+    };
+}
+
 function requireManager(): void {
-    if (!in_array(requireAuth()['role'], ['Administrador', 'Gerente'], true)) jsonError('No tienes permiso para modificar la configuración estratégica.', 403);
+    $norm = normalizeRole(requireAuth()['role']);
+    if (!in_array($norm, ['Administrador', 'Gerente'], true)) jsonError('No tienes permiso para modificar la configuración estratégica.', 403);
 }
+
 function requireAdmin(): void {
-    if (requireAuth()['role'] !== 'Administrador') jsonError('Solo el administrador puede realizar esta operación.', 403);
+    $norm = normalizeRole(requireAuth()['role']);
+    if ($norm !== 'Administrador') jsonError('Solo el administrador puede realizar esta operación.', 403);
 }
+
 function csrfToken(): string { return $_SESSION['csrf'] ??= bin2hex(random_bytes(32)); }
 function requireCsrf(): void {
     if (!hash_equals(csrfToken(), $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) jsonError('Token de seguridad inválido. Recarga la página.', 403);
@@ -26,17 +42,19 @@ function requireCsrf(): void {
 
 function canRecordMeasurement(array $user, array $kpi): bool
 {
-    return in_array($user['role'], ['Administrador', 'Gerente', 'Responsable de indicadores'], true)
+    $norm = normalizeRole($user['role']);
+    return in_array($norm, ['Administrador', 'Gerente', 'Responsable de indicadores'], true)
         || $user['name'] === $kpi['responsible'];
 }
 
 function requirePharmacyRole(array $allowedRoles): array
 {
     $user = requireAuth();
-    if ($user['role'] === 'Administrador') {
+    $norm = normalizeRole($user['role']);
+    if ($norm === 'Administrador' || $user['role'] === 'Administrador') {
         return $user;
     }
-    if (in_array($user['role'], $allowedRoles, true)) {
+    if (in_array($norm, $allowedRoles, true) || in_array($user['role'], $allowedRoles, true)) {
         return $user;
     }
     jsonError('No tienes permisos suficientes para realizar esta operación en la botica.', 403);

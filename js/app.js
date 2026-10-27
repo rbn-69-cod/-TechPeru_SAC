@@ -3380,15 +3380,38 @@ import { createBoticaModule } from './botica.js';
       if (e.key === 'Escape') closeModal();
       if (e.key === 'Tab') trapFocus(e, $('#modalLayer'));
     });
-    // Formulario de login
+    // Formulario de login MediZano
     function fillDemoUser() {
+      const sel = $("#selDemoRole");
+      const opt = sel?.options[sel?.selectedIndex || 0];
+      const email = opt?.dataset.email || "admin@medizano.pe";
+      const role = opt?.dataset.role || "ROLE_ADMIN";
+      const desc = opt?.dataset.desc || "Control Total: Auditoría, usuarios, POS, lotes y finanzas";
       const u = $("#loginUser");
       const p = $("#loginPass");
-      if (u) u.value = "admin@demo.com";
-      if (p) p.value = "BSC2026!";
+      if (u) u.value = email;
+      if (p) p.value = "admin123";
+      const lblUser = $("#lblDemoUser");
+      if (lblUser) lblUser.textContent = email;
+      const lblDesc = $("#lblDemoDesc");
+      if (lblDesc) lblDesc.innerHTML = `Rol: <b>${role}</b> — ${desc}`;
       $("#loginError")?.classList.add("hidden");
       $('#loginForm button[type="submit"]')?.focus();
     }
+
+    $("#selDemoRole")?.addEventListener("change", () => {
+      const sel = $("#selDemoRole");
+      const opt = sel.options[sel.selectedIndex];
+      const email = opt.dataset.email;
+      const role = opt.dataset.role;
+      const desc = opt.dataset.desc;
+      const lblUser = $("#lblDemoUser");
+      if (lblUser) lblUser.textContent = email;
+      const lblDesc = $("#lblDemoDesc");
+      if (lblDesc) lblDesc.innerHTML = `Rol: <b>${role}</b> — ${desc}`;
+      $("#loginUser").value = email;
+      $("#loginPass").value = "admin123";
+    });
     $("#btnFillDemoUser")?.addEventListener("click", e => {
       e.stopPropagation();
       fillDemoUser();

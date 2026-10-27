@@ -58,3 +58,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     jsonError('Acción no soportada.', 400);
 }
+

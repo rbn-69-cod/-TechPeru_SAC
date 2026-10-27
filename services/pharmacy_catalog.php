@@ -251,3 +251,4 @@ function saveCustomer(PDO $pdo, array $data, ?int $id = null): array
     $stmt->execute([$id]);
     return $stmt->fetch();
 }
+

@@ -43,3 +43,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     logActivity($pdo, 'CONFIG_BOTICA', 'botica_settings', 'global', 'Parámetros y configuración de botica actualizados');
     jsonResponse(['success' => true, 'message' => 'Configuración de botica actualizada correctamente.']);
 }
+

@@ -25,3 +25,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         jsonError('Error al guardar cliente: ' . $e->getMessage(), 500);
     }
 }
+

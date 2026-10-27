@@ -162,3 +162,4 @@ function getShiftHistory(PDO $pdo, int $limit = 30): array
     $stmt->execute([$limit]);
     return $stmt->fetchAll();
 }
+

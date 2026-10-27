@@ -255,3 +255,4 @@ function adjustStock(PDO $pdo, int $productoId, int $loteId, int $cantidad, stri
         ];
     });
 }
+
