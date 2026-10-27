@@ -1,17 +1,33 @@
-# TechPeru SAC · Balanced Scorecard
+# TechPeru SAC · Balanced Scorecard (BSC 2025)
 
-Aplicación de seguimiento estratégico con HTML/CSS/JavaScript, PHP 8.3 y SQLite (PDO). Conserva dashboard, mapa, objetivos, indicadores, mediciones, iniciativas, reportes CSV/impresión y administración. Necesita servidor PHP: abrir `index.html` como archivo no ejecuta el backend.
+Sistema web empresarial de Balanced Scorecard (Cuadro de Mando Integral) desarrollado con arquitectura completa: Frontend interactivo SPA (HTML5, CSS3, JavaScript modular) y Backend robusto en **PHP 8.3 & SQLite (PDO)** con control transaccional ACID, auditoría en tiempo real y persistencia oficial de los 12 objetivos y 36 indicadores (KPIs) con líderes asignados.
 
-## Ejecutar la demostración
+---
 
-Requisitos: PHP 8.3+ con `pdo_sqlite`, o Docker.
+## 🔑 Credenciales de Acceso al Sistema
+
+Para ingresar y probar la aplicación web, utiliza cualquiera de las siguientes cuentas de demostración:
+
+| Rol de Usuario | Correo / Usuario | Contraseña | Área / Nivel de Acceso |
+| :--- | :--- | :--- | :--- |
+| **Administrador** | `admin@demo.com` | `BSC2026!` | **Dirección General** (Acceso total, CRUD completo, auditoría y restauración de BD) |
+| **Gerente de Estrategia** | `gerente@demo.com` | `BSC2026!` | **Gerencia Comercial** (Visualización estratégica, KPIs, iniciativas y reportes) |
+| **Responsable de Indicadores** | `responsable@demo.com` | `BSC2026!` | **Control de Gestión** (Registro de mediciones periódicas y seguimiento de metas) |
+
+---
+
+## 🚀 Cómo Ejecutar el Sistema Localmente
+
+Requisitos: **PHP 8.3+** (con extensión `pdo_sqlite` habilitada).
 
 ```sh
+# Iniciar servidor local
 APP_DEMO=1 php -S 127.0.0.1:8080 router.php
 ```
 
-Alternativa Docker, con datos persistentes en `storage`:
+Luego abre en tu navegador: **[http://localhost:8080](http://localhost:8080)**
 
+Alternativa con **Docker**:
 ```sh
 docker build -t techperu-bsc .
 docker run --rm -p 127.0.0.1:8080:8080 \
@@ -19,9 +35,7 @@ docker run --rm -p 127.0.0.1:8080:8080 \
   -v "$PWD/storage:/app/storage" techperu-bsc
 ```
 
-Abre http://localhost:8080. Si el puerto está ocupado, cambia el puerto local. En una base nueva, `APP_DEMO=1` carga 4 perspectivas, 12 objetivos, 36 indicadores, 108 mediciones y 12 iniciativas desde los datos de referencia de 2025.
-
-Cuentas **exclusivamente de demostración**: `admin@demo.com`, `gerente@demo.com`, `responsable@demo.com`; contraseña `BSC2026!`. La pantalla de acceso no precarga contraseñas. Las bases existentes se conservan y las contraseñas antiguas se convierten a hashes al aplicar la migración. Antes de migrar una base real, guarda una copia de seguridad.
+---
 
 ## Configuración y despliegue
 
