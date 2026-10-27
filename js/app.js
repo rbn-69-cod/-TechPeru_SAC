@@ -77,7 +77,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     mediciones: "Registro de resultados",
     iniciativas: "Iniciativas estratégicas",
     reportes: "Reportes",
-    administracion: "Administración"
+    administracion: "Configuración"
   };
 
   // ========================================================
@@ -243,15 +243,12 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     $("[data-page='administracion']").classList.toggle('hidden', currentUser?.role !== 'Administrador');
     if (currentPage === 'administracion' && currentUser?.role !== 'Administrador') currentPage = 'dashboard';
 
-    // Apply collapsed sidebar preference on desktop
-    try {
-      if (localStorage.getItem('bsc_sidebar_collapsed') === '1' && !matchMedia('(max-width: 900px)').matches) {
-        $('#sidebar')?.classList.add('collapsed');
-        $('#appView')?.classList.add('sidebar-collapsed');
-        const btn = $('#sidebarCollapseBtn');
-        if (btn) btn.innerHTML = ICONS.expand;
-      }
-    } catch (e) {}
+    // Siempre iniciar en modo expandido en escritorio con nombres e iconos visibles
+    $('#sidebar')?.classList.remove('collapsed');
+    $('#appView')?.classList.remove('sidebar-collapsed');
+    const collapseBtn = $('#sidebarCollapseBtn');
+    if (collapseBtn) collapseBtn.innerHTML = ICONS.collapse;
+    try { localStorage.removeItem('bsc_sidebar_collapsed'); } catch (e) {}
 
     // Load system settings
     apiFetch("api/admin.php?action=settings").then(r => {
@@ -273,7 +270,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   }
 
   function setSidebar(open) {
-    const mobile = matchMedia('(max-width: 900px)').matches;
+    const mobile = matchMedia('(max-width: 768px)').matches;
     const sidebar = $('#sidebar');
     if (!sidebar) return;
     sidebar.classList.toggle('open', mobile && open);
@@ -1435,104 +1432,423 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   }
 
   // 7. REPORTES
+  // 7. CENTRO DE REPORTES EJECUTIVOS
+  let repSearchTerm = "";
+  let repStatusFilter = "";
+
   async function renderReports(container) {
-    const res = await apiFetch("api/reports.php?action=summary");
+    const [res, dashRes] = await Promise.all([
+      apiFetch("api/reports.php?action=summary"),
+      apiFetch("api/dashboard.php")
+    ]);
+
+    const g = dashRes.global;
+    const totalBudget = res.initiatives_summary.reduce((a, b) => a + (parseFloat(b.total_budget) || 0), 0);
+    const criticalList = res.critical_kpis || [];
+    let leadersList = res.responsible_ranking || [];
+
+    // Filtrado interactivo de responsables
+    if (repSearchTerm) {
+      const q = repSearchTerm.toLowerCase();
+      leadersList = leadersList.filter(l => 
+        l.responsible.toLowerCase().includes(q) ||
+        (l.responsible_area && l.responsible_area.toLowerCase().includes(q))
+      );
+    }
+    if (repStatusFilter) {
+      leadersList = leadersList.filter(l => {
+        const val = Number(l.avg_compliance);
+        if (repStatusFilter === 'good') return val >= 90;
+        if (repStatusFilter === 'warn') return val >= 75 && val < 90;
+        if (repStatusFilter === 'bad') return val < 75;
+        return true;
+      });
+    }
+
     container.innerHTML = `
-      ${pageHead("Centro de Reportes del Balanced Scorecard", "Informes consolidados, exportación oficial a hojas de cálculo y vista de impresión ejecutiva.", `
-        <button class="btn primary" id="btnExportCSVReport">📥 Descargar CSV Oficial</button>
-        <button class="btn soft" id="btnPrintReport">🖨️ Ver Informe Ejecutivo Impreso</button>
+      ${pageHead("Centro de Reportes Ejecutivos", "Informes consolidados, auditoría de líderes, análisis de brechas y exportación oficial de datos.", `
+        <button class="btn btn-secondary" id="btnPrintReport">
+          ${ICONS.reports} <span>Ver Informe Ejecutivo</span>
+        </button>
+        <button class="btn btn-primary" id="btnExportCSVReport">
+          ${ICONS.download} <span>Exportar Reporte CSV</span>
+        </button>
       `)}
 
-      <div class="report-grid grid">
-        <div class="panel">
-          <h3>Resumen Oficial de Indicadores</h3>
-          <p>Exporta los 36 indicadores organizados por perspectiva con responsables, fórmulas, metas y valores reales.</p>
-          <button class="space-above btn soft full" id="btnCardCSV">Descargar CSV con UTF-8 BOM</button>
-        </div>
-        <div class="panel">
-          <h3>Reporte de Objetivos Críticos</h3>
-          <p>Identifica brechas de cumplimiento inferiores al 75% para la toma de decisiones del directorio.</p>
-          <button class="space-above btn soft full" data-action="filter-crit">Ver KPIs Críticos (${res.critical_kpis.length})</button>
-        </div>
-        <div class="panel">
-          <h3>Presupuesto de Iniciativas</h3>
-          <p>Total presupuestado en proyectos estratégicos activos de TechPeru SAC.</p>
-          <div style="font-size:22px;font-weight:800;color:#1e40af;margin-top:10px">
-            ${currency(res.initiatives_summary.reduce((a, b) => a + (parseFloat(b.total_budget) || 0), 0))}
+      <!-- 6 TARJETAS DE RESUMEN EJECUTIVO -->
+      <section class="grid report-kpi-grid">
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">TOTAL INDICADORES</span>
+            <span class="metric-icon-box blue">${ICONS.table}</span>
           </div>
+          <div class="metric-main-row">
+            <div class="metric-value">${g.total}</div>
+            <span class="status-chip blue">100% Medidos</span>
+          </div>
+          <div class="metric-foot">
+            <span class="metric-foot-primary">4 Perspectivas BSC</span>
+            <span class="metric-foot-secondary">Base SQLite activa</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">KPIS LOGRADOS</span>
+            <span class="metric-icon-box green">${ICONS.check}</span>
+          </div>
+          <div class="metric-main-row">
+            <div class="metric-value" style="color:#16a34a">${g.logrado}</div>
+            <span class="status-chip good"><i class="dot"></i> ${(g.logrado/g.total*100).toFixed(1)}%</span>
+          </div>
+          <div class="metric-foot">
+            <span class="metric-foot-primary">Meta Cumplida</span>
+            <span class="metric-foot-secondary">≥ 90% logro</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">KPIS EN RIESGO</span>
+            <span class="metric-icon-box slate">${ICONS.alert}</span>
+          </div>
+          <div class="metric-main-row">
+            <div class="metric-value" style="color:#d97706">${g.riesgo}</div>
+            <span class="status-chip warn"><i class="dot"></i> ${(g.riesgo/g.total*100).toFixed(1)}%</span>
+          </div>
+          <div class="metric-foot">
+            <span class="metric-foot-primary">Rango de Alerta</span>
+            <span class="metric-foot-secondary">75% - 89% logro</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">KPIS CRÍTICOS</span>
+            <span class="metric-icon-box purple">${ICONS.danger}</span>
+          </div>
+          <div class="metric-main-row">
+            <div class="metric-value" style="color:#dc2626">${criticalList.length}</div>
+            <span class="status-chip bad"><i class="dot"></i> ${(criticalList.length/g.total*100).toFixed(1)}%</span>
+          </div>
+          <div class="metric-foot">
+            <span class="metric-foot-primary">Brecha Detectada</span>
+            <span class="metric-foot-secondary">&lt; 75% logro</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">CUMPLIMIENTO GLOBAL</span>
+            <span class="metric-icon-box blue">${ICONS.gauge}</span>
+          </div>
+          <div class="metric-main-row">
+            <div class="metric-value" style="color:${g.avg_pct >= 90 ? '#16a34a' : g.avg_pct >= 75 ? '#d97706' : '#dc2626'}">
+              ${fmt(g.avg_pct)}%
+            </div>
+            <span class="status-chip ${g.status_key}"><i class="dot"></i> ${g.status_text}</span>
+          </div>
+          <div class="metric-bar-wrap">
+            <div class="metric-bar-fill" style="width:${Math.min(100, g.avg_pct)}%;background:${g.avg_pct >= 90 ? '#16a34a' : g.avg_pct >= 75 ? '#d97706' : '#dc2626'}"></div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">PRESUPUESTO INICIATIVAS</span>
+            <span class="metric-icon-box green">${ICONS.financiera}</span>
+          </div>
+          <div class="metric-main-row">
+            <div class="metric-value" style="font-size:23px;color:#1d4ed8">${currency(totalBudget)}</div>
+            <span class="status-chip blue">8 Proyectos</span>
+          </div>
+          <div class="metric-foot">
+            <span class="metric-foot-primary">Portafolio Activo</span>
+            <span class="metric-foot-secondary">Iniciativas 2025</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANELES DE REPORTES EN CUADRÍCULA -->
+      <div class="section-title-row" style="margin-top:24px">
+        <div class="section-title-left">
+          <h2 class="section-heading">Informes Ejecutivos Disponibles</h2>
+          <span class="section-subheading">Selecciona un informe para descargar en formato estándar o explorar su desglose detallado</span>
         </div>
       </div>
 
-      <!-- DESEMPEÑO POR RESPONSABLE -->
-      <div class="section-space panel">
-        <div class="panel-head">
-          <div>
-            <h3>Ranking de Cumplimiento por Responsable</h3>
-            <p>Promedio de logro según los KPIs asignados a cada líder</p>
+      <section class="grid report-panels-grid">
+        <!-- Panel 1: Matriz Oficial de Indicadores -->
+        <div class="report-action-card">
+          <div class="report-card-top">
+            <span class="report-card-icon blue">${ICONS.table}</span>
+            <div class="report-card-head-text">
+              <strong class="report-card-title">Reporte General de Indicadores</strong>
+              <small class="report-card-badge">36 Indicadores · 12 Objetivos</small>
+            </div>
+          </div>
+          <p class="report-card-desc">
+            Matriz completa del Balanced Scorecard organizada por las 4 perspectivas con metas, fórmulas, línea base, frecuencia y líderes responsables.
+          </p>
+          <div class="report-card-meta">
+            <span><b>36</b> KPIs incluidos</span>
+            <span><b>4</b> Perspectivas</span>
+          </div>
+          <button class="btn btn-secondary full" id="btnCardCSV">
+            ${ICONS.download} <span>Descargar CSV con UTF-8 BOM</span>
+          </button>
+        </div>
+
+        <!-- Panel 2: Brechas y KPIs Críticos -->
+        <div class="report-action-card">
+          <div class="report-card-top">
+            <span class="report-card-icon red">${ICONS.danger}</span>
+            <div class="report-card-head-text">
+              <strong class="report-card-title">Reporte de Objetivos y KPIs Críticos</strong>
+              <small class="report-card-badge red">${criticalList.length} Indicadores en Alerta</small>
+            </div>
+          </div>
+          <p class="report-card-desc">
+            Identifica indicadores con cumplimiento inferior al 75% para la toma de decisiones del directorio y asignación de planes de mitigación.
+          </p>
+          <div class="report-card-meta">
+            <span style="color:#dc2626"><b>${criticalList.length}</b> Brechas críticas</span>
+            <span>Acción requerida</span>
+          </div>
+          <button class="btn btn-secondary full" data-action="filter-crit">
+            ${ICONS.search} <span>Consultar KPIs Críticos (${criticalList.length})</span>
+          </button>
+        </div>
+
+        <!-- Panel 3: Presupuesto y Ejecución de Iniciativas -->
+        <div class="report-action-card">
+          <div class="report-card-top">
+            <span class="report-card-icon green">${ICONS.initiatives}</span>
+            <div class="report-card-head-text">
+              <strong class="report-card-title">Presupuesto de Iniciativas Estratégicas</strong>
+              <small class="report-card-badge green">${currency(totalBudget)}</small>
+            </div>
+          </div>
+          <p class="report-card-desc">
+            Seguimiento financiero y avance porcentual de las iniciativas y proyectos estratégicos implementados en TechPeru SAC para 2025.
+          </p>
+          <div class="report-card-meta">
+            <span><b>${res.initiatives_summary.reduce((a, b) => a + (parseInt(b.count) || 0), 0)}</b> Proyectos</span>
+            <span><b>100%</b> Asignado</span>
+          </div>
+          <button class="btn btn-secondary full" id="btnGoInitiatives">
+            ${ICONS.plus} <span>Ver Detalle de Iniciativas</span>
+          </button>
+        </div>
+
+        <!-- Panel 4: Desempeño Consolidado por Perspectiva -->
+        <div class="report-action-card">
+          <div class="report-card-top">
+            <span class="report-card-icon purple">${ICONS.quadrants}</span>
+            <div class="report-card-head-text">
+              <strong class="report-card-title">Cumplimiento por Perspectiva BSC</strong>
+              <small class="report-card-badge purple">4 Cuadrantes</small>
+            </div>
+          </div>
+          <div class="persp-compact-list">
+            ${res.perspectives.map(p => `
+              <div class="persp-compact-row">
+                <span class="p-name">${escapeHtml(p.name)}</span>
+                <div class="p-bar-wrap">
+                  <div class="p-bar-fill" style="width:${Math.min(100, p.avg_compliance)}%;background:${p.color}"></div>
+                </div>
+                <strong class="p-pct" style="color:${p.color}">${fmt(p.avg_compliance)}%</strong>
+              </div>
+            `).join("")}
+          </div>
+          <button class="btn btn-secondary full" id="btnGoDashboard">
+            ${ICONS.dashboard} <span>Explorar en Dashboard</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- TABLA 1: RANKING OFICIAL DE CUMPLIMIENTO POR RESPONSABLE -->
+      <div class="modern-table-panel" style="margin-top:28px">
+        <div class="modern-table-header-info">
+          <div class="header-info-titles">
+            <div class="header-badge-row">
+              <strong class="panel-main-title">Ranking Oficial de Desempeño por Responsable</strong>
+              <span class="badge-sqlite-live"><i class="pulse-dot"></i> ${leadersList.length} Líderes</span>
+            </div>
+            <p class="panel-sub-desc">
+              Promedio de logro según los KPIs asignados a cada líder y gerencia de TechPeru SAC.
+            </p>
+          </div>
+          <div class="header-info-badges">
+            <span class="table-total-count">28 Líderes Asignados</span>
           </div>
         </div>
+
+        <!-- BARRA DE FILTRADO DE RESPONSABLES -->
+        <div class="table-sub-toolbar">
+          <div class="search-input-wrap" style="max-width:380px">
+            <span class="search-icon-fixed">${ICONS.search}</span>
+            <input type="search" id="repSearchLeader" class="search-input-field" value="${escapeHtml(repSearchTerm)}" placeholder="Buscar por nombre de líder o gerencia...">
+          </div>
+          <div class="status-filters">
+            <button class="status-pill-btn ${!repStatusFilter ? 'active' : ''}" data-rep-status="">Todos</button>
+            <button class="status-pill-btn good ${repStatusFilter === 'good' ? 'active' : ''}" data-rep-status="good">
+              <i class="dot"></i> <span>Logrado (≥90%)</span>
+            </button>
+            <button class="status-pill-btn warn ${repStatusFilter === 'warn' ? 'active' : ''}" data-rep-status="warn">
+              <i class="dot"></i> <span>En Riesgo (75-89%)</span>
+            </button>
+            <button class="status-pill-btn bad ${repStatusFilter === 'bad' ? 'active' : ''}" data-rep-status="bad">
+              <i class="dot"></i> <span>Crítico (&lt;75%)</span>
+            </button>
+          </div>
+        </div>
+
         <div class="table-scroll">
-          <table>
+          <table class="modern-kpi-table">
             <thead>
               <tr>
-                <th>Líder Responsable</th>
+                <th style="min-width:260px">Líder Responsable</th>
                 <th>Área / Gerencia</th>
                 <th>KPIs Asignados</th>
-                <th>Cumplimiento Promedio</th>
+                <th style="min-width:180px">Cumplimiento Promedio</th>
                 <th>Estado General</th>
+                <th style="text-align:right">Acción</th>
               </tr>
             </thead>
             <tbody>
-              ${(res.responsible_ranking || []).map(r => `
+              ${leadersList.length ? leadersList.map(r => {
+                const avg = Number(r.avg_compliance);
+                const sKey = avg >= 90 ? 'good' : (avg >= 75 ? 'warn' : 'bad');
+                const sText = avg >= 90 ? 'Logrado' : (avg >= 75 ? 'En Riesgo' : 'Crítico');
+                const barColor = avg >= 90 ? '#16a34a' : (avg >= 75 ? '#d97706' : '#dc2626');
+                return `
+                  <tr class="modern-table-row">
+                    <td>${renderRespChip(r.responsible, r.responsible_area)}</td>
+                    <td><span class="tag" style="background:#f1f5f9;color:#334155;font-weight:600;padding:4px 8px">${escapeHtml(r.responsible_area)}</span></td>
+                    <td><span class="pill-count" style="font-weight:700">${r.total_kpis} ${r.total_kpis === 1 ? 'KPI' : 'KPIs'}</span></td>
+                    <td>
+                      <div class="kpi-prog-wrap" style="min-width:150px">
+                        <div class="kpi-prog-bar">
+                          <div class="kpi-prog-fill" style="width:${Math.min(100, Math.max(5, avg))}%;background:${barColor}"></div>
+                        </div>
+                        <strong class="prog-pct" style="color:${barColor}">${fmt(avg)}%</strong>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="kpi-status-badge ${sKey}">
+                        <i class="dot"></i> ${sText}
+                      </span>
+                    </td>
+                    <td style="text-align:right">
+                      <button class="btn-table-measure" data-filter-by-leader="${escapeHtml(r.responsible)}" title="Ver indicadores de este líder en el dashboard">
+                        ${ICONS.search} <span>Ver KPIs</span>
+                      </button>
+                    </td>
+                  </tr>
+                `;
+              }).join("") : `
                 <tr>
-                  <td>${renderRespChip(r.responsible, r.responsible_area)}</td>
-                  <td><span class="tag">${escapeHtml(r.responsible_area)}</span></td>
-                  <td><strong>${r.total_kpis}</strong> KPIs</td>
-                  <td><strong>${fmt(r.avg_compliance)}%</strong></td>
-                  <td><span class="status ${r.avg_compliance >= 90 ? 'good' : r.avg_compliance >= 75 ? 'warn' : 'bad'}">${r.avg_compliance >= 90 ? 'Logrado' : r.avg_compliance >= 75 ? 'En Riesgo' : 'Crítico'}</span></td>
+                  <td colspan="6" style="text-align:center;padding:36px;color:#64748b">
+                    No se encontraron responsables que coincidan con la búsqueda.
+                  </td>
                 </tr>
-              `).join("")}
+              `}
             </tbody>
           </table>
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <h3>Desempeño Consolidado por Perspectiva</h3>
-            <p>Datos sincronizados desde la base de datos SQLite</p>
+      <!-- TABLA 2: DETALLE DE KPIS CRÍTICOS Y PLAN DE ACCIÓN RECOMENDADO -->
+      <div class="modern-table-panel" style="margin-top:28px">
+        <div class="modern-table-header-info" style="border-left:4px solid #dc2626">
+          <div class="header-info-titles">
+            <div class="header-badge-row">
+              <strong class="panel-main-title" style="color:#b91c1c">Detalle de Brechas: ${criticalList.length} Indicadores Críticos</strong>
+              <span class="status-chip bad"><i class="dot"></i> Atención Urgente</span>
+            </div>
+            <p class="panel-sub-desc">
+              Lista prioritaria de KPIs con cumplimiento &lt;75% que requieren asignación presupuestal o ajuste correctivo.
+            </p>
           </div>
+          <span class="table-total-count" style="background:#fef2f2;color:#b91c1c;border-color:#fecaca">
+            ${criticalList.length} Brechas Detectadas
+          </span>
         </div>
         <div class="table-scroll">
-          <table>
+          <table class="modern-kpi-table">
             <thead>
               <tr>
+                <th style="min-width:240px">Indicador (KPI)</th>
                 <th>Perspectiva</th>
-                <th>KPIs Asignados</th>
-                <th>Cumplimiento Promedio</th>
-                <th>Estado General</th>
+                <th>Responsable</th>
+                <th>Meta</th>
+                <th>Real Actual</th>
+                <th>% Cumpl.</th>
+                <th style="min-width:240px">Acción y Recomendación para el Directorio</th>
               </tr>
             </thead>
             <tbody>
-              ${res.perspectives.map(p => `
-                <tr>
-                  <td><strong>${escapeHtml(p.title || p.name)}</strong></td>
-                  <td>${p.kpi_count} KPIs</td>
-                  <td><strong>${fmt(p.avg_compliance)}%</strong></td>
-                  <td><span class="status ${p.avg_compliance >= 90 ? 'good' : p.avg_compliance >= 75 ? 'warn' : 'bad'}">${p.avg_compliance >= 90 ? 'Logrado' : p.avg_compliance >= 75 ? 'En Riesgo' : 'Crítico'}</span></td>
-                </tr>
-              `).join("")}
+              ${criticalList.map(k => {
+                const pct = Number(k.compliance_pct);
+                return `
+                  <tr class="modern-table-row">
+                    <td>
+                      <div class="kpi-title-block">
+                        <span class="kpi-code-pill" style="background:#dc2626">${escapeHtml(k.id)}</span>
+                        <strong class="kpi-headline">${escapeHtml(k.name)}</strong>
+                        <small class="kpi-objective-desc">${escapeHtml(k.objective_name || '')}</small>
+                      </div>
+                    </td>
+                    <td><span class="persp-tag ${k.perspective_id}">${escapeHtml(k.perspective_name || k.perspective_id)}</span></td>
+                    <td>${renderRespChip(k.responsible, k.responsible_area)}</td>
+                    <td><b>${fmt(k.target)}</b> <small class="unit-badge">${escapeHtml(k.unit)}</small></td>
+                    <td><b style="color:#dc2626">${fmt(k.current_real)}</b></td>
+                    <td>
+                      <span class="status-chip bad" style="font-size:11px"><i class="dot"></i> ${fmt(pct)}%</span>
+                    </td>
+                    <td class="col-action-rec">
+                      <div class="action-rec-box">${escapeHtml(k.action_recommended || 'Intervención inmediata')}</div>
+                    </td>
+                  </tr>
+                `;
+              }).join("")}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
+    // Event listeners
     $("#btnExportCSVReport")?.addEventListener("click", () => window.location.href = "api/reports.php?action=export_csv");
     $("#btnCardCSV")?.addEventListener("click", () => window.location.href = "api/reports.php?action=export_csv");
     $("#btnPrintReport")?.addEventListener("click", () => window.open("api/reports.php?action=print_html", "_blank"));
     $$("[data-action='filter-crit']").forEach(b => b.onclick = () => { pendingKpiStatus = "bad"; navigate("kpis"); });
+    $("#btnGoInitiatives")?.addEventListener("click", () => navigate("iniciativas"));
+    $("#btnGoDashboard")?.addEventListener("click", () => navigate("dashboard"));
+
+    // Leader search & filter
+    const searchLeaderInput = $("#repSearchLeader");
+    if (searchLeaderInput) {
+      searchLeaderInput.oninput = (e) => {
+        repSearchTerm = e.target.value;
+        renderCurrentPage();
+      };
+    }
+    $$("[data-rep-status]").forEach(btn => {
+      btn.onclick = () => {
+        repStatusFilter = btn.dataset.repStatus || "";
+        renderCurrentPage();
+      };
+    });
+
+    // Filter by leader button
+    $$("[data-filter-by-leader]").forEach(btn => {
+      btn.onclick = () => {
+        activeRespFilter = btn.dataset.filterByLeader;
+        navigate("dashboard");
+      };
+    });
   }
 
   // ========================================================
@@ -2694,7 +3010,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     $('#menuToggle').addEventListener('click', () => setSidebar(!$('#sidebar').classList.contains('open')));
     $('#sidebarClose').addEventListener('click', () => setSidebar(false));
     $('#sidebarBackdrop').addEventListener('click', () => setSidebar(false));
-    matchMedia('(max-width: 900px)').addEventListener('change', () => setSidebar(false));
+    matchMedia('(max-width: 768px)').addEventListener('change', () => setSidebar(false));
     setSidebar(false);
 
     // Profile navigation
