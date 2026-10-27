@@ -12,7 +12,7 @@ import { createBoticaModule } from './botica.js';
 
   let currentUser = null;
   let modalReturnFocus = null;
-  let currentPage = "botica_dashboard";
+  let currentPage = "dashboard";
   let dashboardViewMode = "matriz"; // 'matriz', 'cuadrantes', 'graficos'
   let activeExcelFilter = null;
   let activeStatusFilter = null;
@@ -70,6 +70,14 @@ import { createBoticaModule } from './botica.js';
   };
 
   const pageTitles = {
+    dashboard: "Dashboard Ejecutivo — Botica MediZano",
+    mapa: "Mapa Estratégico Farmacéutico",
+    objetivos: "Objetivos Estratégicos",
+    kpis: "Indicadores de Salud (KPI)",
+    mediciones: "Registro y Auditoría de Resultados",
+    iniciativas: "Iniciativas Estratégicas",
+    reportes: "Centro de Reportes",
+    administracion: "Configuración y Usuarios",
     botica_dashboard: "Dashboard de Botica",
     botica_pos: "Terminal Punto de Venta (POS)",
     botica_productos: "Medicamentos y Catálogo",
@@ -80,15 +88,7 @@ import { createBoticaModule } from './botica.js';
     botica_caja: "Caja y Arqueo de Turno",
     botica_comprobantes: "Comprobantes Emitidos",
     botica_reportes: "Reportes de Botica",
-    botica_config: "Configuración y MediZano",
-    dashboard: "Dashboard ejecutivo (BSC)",
-    mapa: "Mapa estratégico (BSC)",
-    objetivos: "Objetivos estratégicos",
-    kpis: "Indicadores (KPI)",
-    mediciones: "Registro de resultados",
-    iniciativas: "Iniciativas estratégicas",
-    reportes: "Reportes (BSC)",
-    administracion: "Configuración BSC"
+    botica_config: "Configuración y MediZano"
   };
 
   // ========================================================
@@ -452,8 +452,23 @@ import { createBoticaModule } from './botica.js';
       contentHtml = renderChartsBlock(res.perspectives, res.trend);
     }
 
+    const comp = res.company || {
+      name: "Botica MediZano",
+      title: "Balanced Scorecard 2025-2026",
+      period: "Plan Estratégico Farmacéutico · 2025",
+      mission: "Garantizar a la comunidad el acceso oportuno, seguro y accesible a medicamentos y productos de salud de alta calidad, brindando una atención farmacéutica profesional, ética y personalizada, respaldada por tecnología de vanguardia y rigurosa trazabilidad sanitaria.",
+      vision: "Consolidarnos al 2026 como la botica y plataforma farmacéutica líder en dispensación digital, control estricto de calidad FEFO y excelencia en el cuidado de la salud en el Perú."
+    };
+
+    // Geometría del Círculo de Avance Global (Advance Circle Gauge)
+    const circleRadius = 35;
+    const circleCircumference = 2 * Math.PI * circleRadius; // ~219.91
+    const safeAvg = Math.min(100, Math.max(0, Number(g.avg_pct) || 0));
+    const dashOffset = circleCircumference * (1 - safeAvg / 100);
+    const circleColor = safeAvg >= 90 ? '#16a34a' : (safeAvg >= 75 ? '#d97706' : '#dc2626');
+
     container.innerHTML = `
-      ${pageHead("BALANCED SCORECARD — TechPeru SAC | 2025", "Tablero Estratégico Ejecutivo · Persistencia en Base de Datos SQLite · 4 Perspectivas · 36 KPIs", `
+      ${pageHead("BALANCED SCORECARD — Botica MediZano | 2025-2026", "Tablero Estratégico Ejecutivo · Plan Integral Farmacéutico · 4 Perspectivas · 36 KPIs", `
         <button class="btn btn-secondary" id="btnExportDashCSV">
           ${ICONS.download} <span>Exportar Reporte CSV</span>
         </button>
@@ -462,27 +477,65 @@ import { createBoticaModule } from './botica.js';
         </button>
       `)}
 
-      <!-- 4 TARJETAS KPI EJECUTIVAS -->
-      <section class="grid metric-grid">
-        <div class="metric-card metric-card-global">
-          <div class="metric-top">
-            <span class="metric-label">CUMPLIMIENTO GLOBAL</span>
-            <span class="metric-icon-box blue">${ICONS.gauge}</span>
-          </div>
-          <div class="metric-main-row">
-            <div class="metric-value" style="color:${g.avg_pct >= 90 ? '#16a34a' : g.avg_pct >= 75 ? '#d97706' : '#dc2626'}">
-              ${fmt(g.avg_pct)}%
+      <!-- MISIÓN Y VISIÓN OFICIALES BOTICA MEDIZANO -->
+      <section class="mission-vision-grid">
+        <div class="mv-card mv-mission">
+          <div class="mv-head">
+            <span class="mv-icon">⚕️</span>
+            <div>
+              <span class="mv-tag">PROPÓSITO SANITARIO</span>
+              <h3>Misión de Botica MediZano</h3>
             </div>
-            <span class="status-chip ${g.status_key}">
-              <i class="dot"></i> ${g.status_text}
-            </span>
           </div>
-          <div class="metric-bar-wrap">
-            <div class="metric-bar-fill" style="width:${Math.min(100, g.avg_pct)}%;background:${g.avg_pct >= 90 ? '#16a34a' : g.avg_pct >= 75 ? '#d97706' : '#dc2626'}"></div>
+          <p>${escapeHtml(comp.mission)}</p>
+        </div>
+        <div class="mv-card mv-vision">
+          <div class="mv-head">
+            <span class="mv-icon">🎯</span>
+            <div>
+              <span class="mv-tag">RUMBO ESTRATÉGICO 2026</span>
+              <h3>Visión de Botica MediZano</h3>
+            </div>
           </div>
-          <div class="metric-foot">
-            <span class="metric-foot-primary">${g.total} KPIs evaluados</span>
-            <span class="metric-foot-secondary">Base SQLite activa</span>
+          <p>${escapeHtml(comp.vision)}</p>
+        </div>
+      </section>
+
+      <!-- SEMAFORIZACIÓN Y ESTADOS DE ALERTA -->
+      ${g.critico > 0 ? `
+        <div class="alert-strip">
+          <div class="alert-strip-left">
+            <span>⚠️</span>
+            <span>Atención: Se identifican <b>${g.critico} indicadores en estado crítico</b> (&lt; 75%) que requieren revisión inmediata en dispensación y servicio.</span>
+          </div>
+          <button class="alert-strip-btn" id="btnQuickCriticalFilter">Filtrar Críticos (${g.critico})</button>
+        </div>
+      ` : `
+        <div class="alert-strip all-good">
+          <div class="alert-strip-left">
+            <span>✅</span>
+            <span>Operación Farmacéutica Óptima: <b>${g.logrado} de ${g.total} metas</b> logradas con rotación FEFO garantizada.</span>
+          </div>
+        </div>
+      `}
+
+      <!-- 4 TARJETAS KPI EJECUTIVAS: CÍRCULO DE AVANCE Y SALUD -->
+      <section class="grid metric-grid">
+        <div class="metric-card metric-card-advance">
+          <div class="circle-gauge-box">
+            <svg class="circle-gauge-svg" viewBox="0 0 86 86">
+              <circle class="circle-gauge-track" cx="43" cy="43" r="${circleRadius}"></circle>
+              <circle class="circle-gauge-fill" cx="43" cy="43" r="${circleRadius}" stroke="${circleColor}" stroke-dasharray="${circleCircumference.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}"></circle>
+            </svg>
+            <div class="circle-gauge-center">
+              <span class="circle-gauge-pct" style="color:${circleColor}">${fmt(g.avg_pct)}%</span>
+              <span class="circle-gauge-lbl">Avance</span>
+            </div>
+          </div>
+          <div class="advance-info">
+            <span class="metric-label">CUMPLIMIENTO GLOBAL</span>
+            <div><span class="status-chip ${g.status_key}"><i class="dot"></i> ${g.status_text}</span></div>
+            <div class="advance-meta" style="margin-top:6px">${g.total} KPIs farmacéuticos<br>Base SQLite activa</div>
           </div>
         </div>
 
@@ -959,6 +1012,12 @@ import { createBoticaModule } from './botica.js';
         renderCurrentPage();
       };
     }
+    if ($('#btnQuickCriticalFilter')) {
+      $('#btnQuickCriticalFilter').onclick = () => {
+        activeStatusFilter = 'bad';
+        renderCurrentPage();
+      };
+    }
     if ($('#btnSearchClear')) {
       $('#btnSearchClear').onclick = () => {
         kpiSearchTerm = "";
@@ -991,10 +1050,10 @@ import { createBoticaModule } from './botica.js';
   async function renderMap(container) {
     const res = await apiFetch("api/dashboard.php");
     const flowDescriptions = [
-      "▲ Genera valor financiero, rentabilidad sobre patrimonio y optimización de costos ▲",
-      "▲ Conduce a la lealtad, satisfacción post-venta y retención de clientes ▲",
-      "▲ Es impulsado por la excelencia operativa, calidad, OTD de proveedores e innovación ▲",
-      "● Base y cimientos: Capital humano, cultura organizacional, I+D e ideas implementadas ●"
+      "▲ Genera valor financiero, rentabilidad farmacéutica y optimización de costos en botica ▲",
+      "▲ Conduce a la lealtad, satisfacción del paciente y adherencia a tratamientos de salud ▲",
+      "▲ Es impulsado por la excelencia en dispensación BPD, rotación estricta FEFO y alianzas con laboratorios ▲",
+      "● Base y cimientos: Formación farmacéutica continua, seguridad del paciente y digitalización POS ●"
     ];
 
     const order = ["financiera", "clientes", "procesos", "aprendizaje"];
@@ -1030,17 +1089,17 @@ import { createBoticaModule } from './botica.js';
     }).join("");
 
     container.innerHTML = `
-      ${pageHead("Mapa Estratégico — TechPeru SAC 2025", "Relaciones de causa y efecto a través de las 4 perspectivas del Balanced Scorecard.", `
+      ${pageHead("Mapa Estratégico — Botica MediZano 2025-2026", "Relaciones de causa y efecto a través de las 4 perspectivas del Balanced Scorecard Farmacéutico.", `
         <button class="btn" id="btnExportMapCSV">📥 Exportar CSV</button>
         <button class="btn primary" id="btnNewObj">＋ Nuevo objetivo</button>
       `)}
       <section class="panel">
         <div class="panel-head">
           <div>
-            <h2>Mapa Estratégico Corporativo</h2>
-            <p>Consulta los indicadores, responsables y acciones de cada objetivo</p>
+            <h2>Mapa Estratégico Farmacéutico</h2>
+            <p>Consulta los indicadores, responsables y acciones de cada objetivo de salud</p>
           </div>
-          <span class="tag">TechPeru SAC · Gestión estratégica</span>
+          <span class="tag">Botica MediZano · Gestión Estratégica</span>
         </div>
         <div class="strategy-map">${lanesHtml}</div>
         <div class="map-legend" style="margin-top:18px">
@@ -1272,7 +1331,7 @@ import { createBoticaModule } from './botica.js';
           <div class="panel-head">
             <div>
               <h3>Registrar Nueva Medición Real</h3>
-              <p>Actualiza el semáforo y almacena en la base de datos de TechPeru SAC</p>
+              <p>Actualiza el semáforo y almacena en la base de datos de Botica MediZano</p>
             </div>
           </div>
           <form id="directMeasureForm" class="detail-form-grid">
@@ -1735,7 +1794,7 @@ import { createBoticaModule } from './botica.js';
             </div>
           </div>
           <p class="report-card-desc">
-            Seguimiento financiero y avance porcentual de las iniciativas y proyectos estratégicos implementados en TechPeru SAC para 2025.
+            Seguimiento financiero y avance porcentual de las iniciativas y proyectos estratégicos implementados en Botica MediZano para 2025-2026.
           </p>
           <div class="report-card-meta">
             <span><b>${res.initiatives_summary.reduce((a, b) => a + (parseInt(b.count) || 0), 0)}</b> Proyectos</span>
@@ -1781,7 +1840,7 @@ import { createBoticaModule } from './botica.js';
               <span class="badge-sqlite-live"><i class="pulse-dot"></i> ${leadersList.length} Líderes</span>
             </div>
             <p class="panel-sub-desc">
-              Promedio de logro según los KPIs asignados a cada líder y gerencia de TechPeru SAC.
+              Promedio de logro según los KPIs asignados a cada líder y área de Botica MediZano.
             </p>
           </div>
           <div class="header-info-badges">
@@ -2068,7 +2127,7 @@ import { createBoticaModule } from './botica.js';
             <div class="panel-head">
               <div>
                 <h3>Datos Personales & Cargo</h3>
-                <p>Información de tu cuenta en TechPeru SAC</p>
+                <p>Información de tu cuenta en Botica MediZano</p>
               </div>
             </div>
             <form id="profileEditForm" class="grid" style="gap:16px">
@@ -2206,15 +2265,15 @@ import { createBoticaModule } from './botica.js';
             <form id="settingsForm" class="grid" style="gap:14px">
               <div class="field">
                 <label for="setCompName"><strong>Nombre de la Organización</strong></label>
-                <input id="setCompName" type="text" value="${escapeHtml(settings.company_name || 'TechPeru SAC')}" required>
+                <input id="setCompName" type="text" value="${escapeHtml(settings.company_name || 'Botica MediZano')}" required>
               </div>
               <div class="field">
                 <label for="setBscTitle"><strong>Título del Balanced Scorecard</strong></label>
-                <input id="setBscTitle" type="text" value="${escapeHtml(settings.bsc_title || 'Balanced Scorecard 2025')}" required>
+                <input id="setBscTitle" type="text" value="${escapeHtml(settings.bsc_title || 'Balanced Scorecard 2025-2026')}" required>
               </div>
               <div class="field">
                 <label for="setPeriod"><strong>Período Estratégico Visible</strong></label>
-                <input id="setPeriod" type="text" value="${escapeHtml(settings.strategic_period || 'Plan Estratégico · 2025')}" required>
+                <input id="setPeriod" type="text" value="${escapeHtml(settings.strategic_period || 'Plan Estratégico Farmacéutico · 2025')}" required>
               </div>
               <div style="margin-top:10px">
                 <button type="submit" class="btn primary full">💾 Guardar Configuración de la Empresa</button>
@@ -2264,7 +2323,7 @@ import { createBoticaModule } from './botica.js';
             <div style="margin-top:20px;border-top:1px solid #e2e8f0;padding-top:16px">
               <div class="space-below info-box">
                 <strong>Restaurar Datos Oficiales del Balanced Scorecard:</strong><br>
-                Restaura los 12 objetivos, los 36 KPIs y los responsables oficiales de TechPeru SAC (2025).
+                Restaura los 12 objetivos, los 36 KPIs y los responsables oficiales de Botica MediZano (2025-2026).
               </div>
               <button class="btn danger full" id="btnResetDB">🔄 Restaurar Base de Datos del BSC (Valores Oficiales 2025)</button>
             </div>
@@ -2817,7 +2876,7 @@ import { createBoticaModule } from './botica.js';
 
     // 4. RESET DEMO DB
     $("#btnResetDB")?.addEventListener("click", async () => {
-      if (confirm("¿Estás seguro de restablecer la base de datos a los valores oficiales del Balanced Scorecard de TechPeru SAC 2025?")) {
+      if (confirm("¿Estás seguro de restablecer la base de datos a los valores oficiales del Balanced Scorecard de Botica MediZano?")) {
         try {
           const r = await apiFetch("api/admin.php?action=reset", { method: "POST" });
           toast(r.message);

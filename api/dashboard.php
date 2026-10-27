@@ -116,8 +116,23 @@ $trend = $stmt->fetchAll();
 $responsibles = $pdo->query("SELECT DISTINCT responsible, responsible_area FROM kpis ORDER BY responsible ASC")->fetchAll();
 $areas = $pdo->query("SELECT DISTINCT responsible_area FROM kpis ORDER BY responsible_area ASC")->fetchAll();
 
+// 9. Configuración institucional (Misión, Visión, Empresa)
+$settingsRows = [];
+try {
+    $settingsRows = $pdo->query("SELECT key, value FROM system_settings")->fetchAll(PDO::FETCH_KEY_PAIR);
+} catch (Exception $e) {}
+
+$company = [
+    'name' => $settingsRows['company_name'] ?? 'Botica MediZano',
+    'title' => $settingsRows['bsc_title'] ?? 'Balanced Scorecard 2025-2026',
+    'period' => $settingsRows['strategic_period'] ?? 'Plan Estratégico Farmacéutico · 2025',
+    'mission' => $settingsRows['mission'] ?? 'Garantizar a la comunidad el acceso oportuno, seguro y accesible a medicamentos y productos de salud de alta calidad, brindando una atención farmacéutica profesional, ética y personalizada, respaldada por tecnología de vanguardia y rigurosa trazabilidad sanitaria.',
+    'vision' => $settingsRows['vision'] ?? 'Consolidarnos al 2026 como la botica y plataforma farmacéutica líder en dispensación digital, control estricto de calidad FEFO y excelencia en el cuidado de la salud en el Perú.'
+];
+
 jsonResponse([
     'success' => true,
+    'company' => $company,
     'global' => [
         'avg_pct' => $avgPct,
         'status_text' => $globalStatusText,

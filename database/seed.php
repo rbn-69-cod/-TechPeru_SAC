@@ -68,77 +68,77 @@ function seedDatabase(PDO $pdo): void {
             throw new Exception("No se encontraron los datos maestros del BSC.");
         }
 
-        // Mapeo detallado de Responsables, Áreas y Fórmulas para cada uno de los 36 KPIs
+        // Mapeo detallado de Responsables, Áreas y Fórmulas para cada uno de los 36 KPIs (Botica MediZano)
         $metaDetails = [
             // FINANCIERA
-            'KPI-01' => ['resp' => 'Lic. Carlos Mendoza', 'area' => 'Gerencia de Finanzas', 'freq' => 'Trimestral', 'base' => 15.0, 'formula' => '(Utilidad Neta / Patrimonio Neto) × 100'],
-            'KPI-02' => ['resp' => 'Mg. Patricia Valdivia', 'area' => 'Control Financiero', 'freq' => 'Mensual', 'base' => 18.5, 'formula' => '(EBITDA / Ingresos Operativos) × 100'],
-            'KPI-03' => ['resp' => 'Lic. Carlos Mendoza', 'area' => 'Gerencia de Finanzas', 'freq' => 'Trimestral', 'base' => 1.65, 'formula' => 'Ingresos Totales - Costos - Gastos - Impuestos'],
-            'KPI-04' => ['resp' => 'Ing. Roberto Benítez', 'area' => 'Gerencia Comercial', 'freq' => 'Trimestral', 'base' => 10.2, 'formula' => '((Ventas Actual - Ventas Anterior) / Ventas Anterior) × 100'],
-            'KPI-05' => ['resp' => 'Ing. Roberto Benítez', 'area' => 'Gerencia Comercial', 'freq' => 'Mensual', 'base' => 7.1, 'formula' => '∑ Facturación bruta neta de devoluciones (S/ MM)'],
-            'KPI-06' => ['resp' => 'Lic. Mariana Costa', 'area' => 'Desarrollo de Negocios', 'freq' => 'Trimestral', 'base' => 12.0, 'formula' => '(Facturación Nuevos Productos / Facturación Total) × 100'],
-            'KPI-07' => ['resp' => 'Mg. Fernando Zúñiga', 'area' => 'Auditoría de Costos', 'freq' => 'Mensual', 'base' => 61.0, 'formula' => '(Costos Operativos Totales / Ingresos Totales) × 100'],
-            'KPI-08' => ['resp' => 'Lic. Andrea Gallardo', 'area' => 'Growth & Marketing', 'freq' => 'Mensual', 'base' => 450.0, 'formula' => 'Gastos Totales Mkt y Ventas / Nuevos Clientes Adquiridos'],
-            'KPI-09' => ['resp' => 'Mg. Patricia Valdivia', 'area' => 'Control Financiero', 'freq' => 'Trimestral', 'base' => 7.0, 'formula' => '(Utilidad Neta / Total Activos) × 100'],
+            'KPI-01' => ['resp' => 'Lic. Igarlos Mamani', 'area' => 'Finanzas & Pagos', 'freq' => 'Trimestral', 'base' => 28.0, 'formula' => '((Ventas Medicamentos - Costo de Ventas) / Ventas Medicamentos) × 100'],
+            'KPI-02' => ['resp' => 'Mg. Patricia Valdivia', 'area' => 'Control Financiero', 'freq' => 'Mensual', 'base' => 20.0, 'formula' => '(EBITDA Operativo de Botica / Ingresos Totales) × 100'],
+            'KPI-03' => ['resp' => 'Lic. Igarlos Mamani', 'area' => 'Finanzas & Pagos', 'freq' => 'Trimestral', 'base' => 1.80, 'formula' => 'Ingresos Farmacia - Costos - Gastos Operativos - Impuestos'],
+            'KPI-04' => ['resp' => 'Q.F. Kenyi Calsin', 'area' => 'Ventas & Dispensación', 'freq' => 'Trimestral', 'base' => 11.0, 'formula' => '((Ventas Año Actual - Ventas Año Anterior) / Ventas Año Anterior) × 100'],
+            'KPI-05' => ['resp' => 'Q.F. Kenyi Calsin', 'area' => 'Ventas & Dispensación', 'freq' => 'Mensual', 'base' => 7.5, 'formula' => '∑ Total facturado en boletas y facturas emitidas por la botica'],
+            'KPI-06' => ['resp' => 'Lic. Juan Chambilla', 'area' => 'Facturación & Mostrador', 'freq' => 'Mensual', 'base' => 36.0, 'formula' => 'Ventas Totales del Período / Número de Transacciones de Pacientes'],
+            'KPI-07' => ['resp' => 'Q.F. Aldo Calla', 'area' => 'Farmacología & Control de Stock', 'freq' => 'Mensual', 'base' => 2.2, 'formula' => '(Valor de Medicamentos Descartados por Vencimiento / Costo de Ventas) × 100'],
+            'KPI-08' => ['resp' => 'Lic. Igarlos Mamani', 'area' => 'Finanzas & Pagos', 'freq' => 'Mensual', 'base' => 18.0, 'formula' => '∑ Cuentas por Cobrar de Pagos Digitales / Ventas Diarias Digitales'],
+            'KPI-09' => ['resp' => 'Mg. Patricia Valdivia', 'area' => 'Control Financiero', 'freq' => 'Trimestral', 'base' => 7.8, 'formula' => '(Utilidad Neta de Botica / Activos Totales en Inventario) × 100'],
 
-            // CLIENTES
-            'KPI-10' => ['resp' => 'Lic. Camila Paredes', 'area' => 'Experiencia del Cliente (CX)', 'freq' => 'Trimestral', 'base' => 52.0, 'formula' => '% Promotores - % Detractores (Encuesta NPS)'],
-            'KPI-11' => ['resp' => 'Lic. Camila Paredes', 'area' => 'Experiencia del Cliente (CX)', 'freq' => 'Mensual', 'base' => 79.0, 'formula' => '(Calificaciones 4-5 estrellas / Total Calificaciones) × 100'],
-            'KPI-12' => ['resp' => 'Ing. Javier Bustamante', 'area' => 'Soporte al Cliente', 'freq' => 'Mensual', 'base' => 3.4, 'formula' => '∑ Días para resolver reclamo / Total Reclamos Resueltos'],
-            'KPI-13' => ['resp' => 'Mg. Vanessa Rivas', 'area' => 'Customer Success', 'freq' => 'Trimestral', 'base' => 84.0, 'formula' => '((Clientes Fin - Clientes Nuevos) / Clientes Inicio) × 100'],
-            'KPI-14' => ['resp' => 'Mg. Vanessa Rivas', 'area' => 'Customer Success', 'freq' => 'Mensual', 'base' => 42.0, 'formula' => '(Clientes con Recompra / Total Clientes Activos) × 100'],
-            'KPI-15' => ['resp' => 'Ing. Diego Alarcón', 'area' => 'Retención & CRM', 'freq' => 'Mensual', 'base' => 8.5, 'formula' => '(Clientes que cancelaron / Total Clientes al Inicio) × 100'],
-            'KPI-16' => ['resp' => 'Lic. Martín Velásquez', 'area' => 'Ventas Corporativas', 'freq' => 'Trimestral', 'base' => 88.0, 'formula' => 'Conteo de contratos nuevos formalizados en el período'],
-            'KPI-17' => ['resp' => 'Lic. Mariana Costa', 'area' => 'Inteligencia de Mercado', 'freq' => 'Semestral', 'base' => 7.1, 'formula' => '(Ventas TechPeru / Ventas Totales del Mercado) × 100'],
-            'KPI-18' => ['resp' => 'Lic. Andrea Gallardo', 'area' => 'Marketing Digital', 'freq' => 'Mensual', 'base' => 240.0, 'formula' => 'Inversión en Pauta Digital / Leads Calificados (SQL)'],
+            // CLIENTES Y PACIENTES
+            'KPI-10' => ['resp' => 'Lic. Camila Paredes', 'area' => 'Atención al Paciente & Soporte', 'freq' => 'Trimestral', 'base' => 80.0, 'formula' => '(Pacientes Satisfechos con Atención Farmacéutica / Total Encuestados) × 100'],
+            'KPI-11' => ['resp' => 'Lic. Camila Paredes', 'area' => 'Atención al Paciente & Soporte', 'freq' => 'Mensual', 'base' => 50.0, 'formula' => '% Pacientes Promotores - % Pacientes Detractores'],
+            'KPI-12' => ['resp' => 'Lic. Juan Chambilla', 'area' => 'Facturación & Mostrador', 'freq' => 'Mensual', 'base' => 6.5, 'formula' => '∑ Minutos desde ingreso a cola hasta entrega de medicamentos / Total Pacientes'],
+            'KPI-13' => ['resp' => 'Q.F. Kenyi Calsin', 'area' => 'Ventas & Dispensación', 'freq' => 'Trimestral', 'base' => 74.0, 'formula' => '(Pacientes Crónicos con Recompra Mensual / Total Pacientes Crónicos) × 100'],
+            'KPI-14' => ['resp' => 'Lic. Camila Paredes', 'area' => 'Atención al Paciente & Soporte', 'freq' => 'Mensual', 'base' => 38.0, 'formula' => '(Pacientes con ≥ 2 Compras al Mes / Total Pacientes Atendidos) × 100'],
+            'KPI-15' => ['resp' => 'Lic. Camila Paredes', 'area' => 'Atención al Paciente & Soporte', 'freq' => 'Mensual', 'base' => 9.5, 'formula' => '(Pacientes Inactivos > 90 días / Pacientes Activos al Inicio) × 100'],
+            'KPI-16' => ['resp' => 'Q.F. Kenyi Calsin', 'area' => 'Ventas & Dispensación', 'freq' => 'Trimestral', 'base' => 89.0, 'formula' => '(Recetas con 100% de Medicamentos Dispensados / Total Recetas) × 100'],
+            'KPI-17' => ['resp' => 'Lic. Camila Paredes', 'area' => 'Atención al Paciente & Soporte', 'freq' => 'Mensual', 'base' => 180.0, 'formula' => 'Conteo mensual de nuevos pacientes afiliados al sistema MediZano'],
+            'KPI-18' => ['resp' => 'Lic. Andrea Gallardo', 'area' => 'Canales Digitales & Marketing', 'freq' => 'Mensual', 'base' => 10.0, 'formula' => '(Ventas por Web y Delivery / Ventas Totales de la Botica) × 100'],
 
-            // PROCESOS INTERNOS
-            'KPI-19' => ['resp' => 'Ing. Sofía Morales', 'area' => 'Operaciones & Despacho', 'freq' => 'Mensual', 'base' => 4.2, 'formula' => '∑ Días desde pedido hasta entrega confirmada / N° Pedidos'],
-            'KPI-20' => ['resp' => 'Ing. Raúl Espinoza', 'area' => 'Gestión de la Calidad (QA)', 'freq' => 'Mensual', 'base' => 3.5, 'formula' => '(Entregas con Reclamo o Defecto / Total Entregas) × 100'],
-            'KPI-21' => ['resp' => 'Mg. Fernando Zúñiga', 'area' => 'Eficiencia Operativa', 'freq' => 'Trimestral', 'base' => 0.19, 'formula' => 'Facturación Total (S/ MM) / Plantilla FTE Promedio'],
-            'KPI-22' => ['resp' => 'Ing. Diego Alarcón', 'area' => 'I+D & Ingeniería de Software', 'freq' => 'Semestral', 'base' => 2.0, 'formula' => 'Conteo de nuevas versiones y productos lanzados a producción'],
-            'KPI-23' => ['resp' => 'Ing. Diego Alarcón', 'area' => 'I+D & Ingeniería de Software', 'freq' => 'Trimestral', 'base' => 18.0, 'formula' => 'Semanas transcurridas desde Kick-off hasta Despliegue en Vivo'],
-            'KPI-24' => ['resp' => 'Lic. Mariana Costa', 'area' => 'Estrategia de Producto', 'freq' => 'Trimestral', 'base' => 14.0, 'formula' => '(Ventas de productos con &lt; 2 años / Ventas Totales) × 100'],
-            'KPI-25' => ['resp' => 'Ing. Jorge Navarro', 'area' => 'Cadena de Suministro', 'freq' => 'Mensual', 'base' => 88.0, 'formula' => '(Pedidos de proveedores a tiempo y completos / Total Pedidos) × 100'],
-            'KPI-26' => ['resp' => 'Ing. Jorge Navarro', 'area' => 'Compras & Logística', 'freq' => 'Mensual', 'base' => 11.0, 'formula' => 'Total de incidentes de incumplimiento de SLA de proveedores'],
-            'KPI-27' => ['resp' => 'Mg. Fernando Zúñiga', 'area' => 'Control de Inventarios', 'freq' => 'Mensual', 'base' => 16.8, 'formula' => '(Valor Valorizado de Inventario / Costo de Ventas) × 100'],
+            // PROCESOS INTERNOS FARMACÉUTICOS
+            'KPI-19' => ['resp' => 'Q.F. Kenyi Calsin', 'area' => 'Dirección Técnica Farmacéutica', 'freq' => 'Mensual', 'base' => 92.0, 'formula' => '(Ítems de BPD Conformes en Auditoría Sanitaria / Total Ítems) × 100'],
+            'KPI-20' => ['resp' => 'Q.F. Aldo Calla', 'area' => 'Farmacología & Control de Stock', 'freq' => 'Mensual', 'base' => 0.5, 'formula' => '(Incidentes de Medicamento Incorrecto o Dosis Equivocada / Total Dispensaciones) × 100'],
+            'KPI-21' => ['resp' => 'Lic. Juan Chambilla', 'area' => 'Facturación & Mostrador', 'freq' => 'Mensual', 'base' => 14.0, 'formula' => '∑ Segundos de Procesamiento de Boleta/Factura Electrónica / Total Comprobantes'],
+            'KPI-22' => ['resp' => 'Q.F. Aldo Calla', 'area' => 'Farmacología & Control de Stock', 'freq' => 'Mensual', 'base' => 92.0, 'formula' => '(Lotes Despachados con Vencimiento Más Próximo / Total Lotes Despachados) × 100'],
+            'KPI-23' => ['resp' => 'Q.F. Aldo Calla', 'area' => 'Farmacología & Control de Stock', 'freq' => 'Mensual', 'base' => 94.0, 'formula' => '(Unidades Farmacéuticas Cuadradas sin Discrepancia / Total Unidades) × 100'],
+            'KPI-24' => ['resp' => 'Q.F. Aldo Calla', 'area' => 'Farmacología & Control de Stock', 'freq' => 'Mensual', 'base' => 65.0, 'formula' => '(Lotes con < 90 días Liquidados o Canjeados / Total Lotes Próximos a Caducar) × 100'],
+            'KPI-25' => ['resp' => 'Lic. Juan Chambilla', 'area' => 'Cadena de Suministro & Proveedores', 'freq' => 'Mensual', 'base' => 90.0, 'formula' => '(Medicamentos Esenciales con Stock Disponible / Total Lista Esencial) × 100'],
+            'KPI-26' => ['resp' => 'Lic. Juan Chambilla', 'area' => 'Cadena de Suministro & Proveedores', 'freq' => 'Mensual', 'base' => 80.0, 'formula' => '(Órdenes de Compra Recibidas a Tiempo y Completas / Total Órdenes) × 100'],
+            'KPI-27' => ['resp' => 'Lic. Juan Chambilla', 'area' => 'Cadena de Suministro & Proveedores', 'freq' => 'Mensual', 'base' => 38.0, 'formula' => '∑ Horas desde alerta de stock mínimo hasta ingreso físico a almacén / Total Alertas'],
 
             // APRENDIZAJE Y CRECIMIENTO
-            'KPI-28' => ['resp' => 'Dra. Elena Ramos', 'area' => 'Talento & Cultura', 'freq' => 'Trimestral', 'base' => 28.0, 'formula' => 'Total de Horas Capacitadas Efectivas / Total Colaboradores'],
-            'KPI-29' => ['resp' => 'Dra. Elena Ramos', 'area' => 'Talento & Cultura', 'freq' => 'Semestral', 'base' => 60.0, 'formula' => '(Colaboradores con PDI vigente / Total Colaboradores) × 100'],
-            'KPI-30' => ['resp' => 'Lic. Víctor Hugo Quispe', 'area' => 'Capacitación Técnica', 'freq' => 'Trimestral', 'base' => 68.0, 'formula' => '(Competencias Aprobadas en Evaluación / Requeridas) × 100'],
-            'KPI-31' => ['resp' => 'Lic. Melissa Barreto', 'area' => 'Clima Organizacional', 'freq' => 'Semestral', 'base' => 62.0, 'formula' => 'Puntaje Promedio General Encuesta de Clima Laboral (%)'],
-            'KPI-32' => ['resp' => 'Dra. Elena Ramos', 'area' => 'Talento & Cultura', 'freq' => 'Mensual', 'base' => 13.0, 'formula' => '(Total Bajas en el Período / Plantilla Promedio) × 100'],
-            'KPI-33' => ['resp' => 'Lic. Melissa Barreto', 'area' => 'Desempeño y Compensaciones', 'freq' => 'Anual', 'base' => 78.0, 'formula' => '(Evaluaciones de Desempeño Completadas / Total Evaluables) × 100'],
-            'KPI-34' => ['resp' => 'Ing. Sofía Morales', 'area' => 'Mejora Continua', 'freq' => 'Trimestral', 'base' => 3.0, 'formula' => 'Conteo de Proyectos Kaizen / Mejora Continua en marcha'],
-            'KPI-35' => ['resp' => 'Ing. Diego Alarcón', 'area' => 'Transformación Digital', 'freq' => 'Trimestral', 'base' => 2.8, 'formula' => '(Presupuesto Ejecutado en I+D / Ingresos Totales) × 100'],
-            'KPI-36' => ['resp' => 'Lic. Víctor Hugo Quispe', 'area' => 'Innovación Corporativa', 'freq' => 'Trimestral', 'base' => 10.0, 'formula' => 'Conteo de Ideas de Empleados implementadas con éxito']
+            'KPI-28' => ['resp' => 'Dra. Elena Ramos', 'area' => 'Gestión de Talento & Capacitación', 'freq' => 'Trimestral', 'base' => 25.0, 'formula' => 'Total Horas Efectivas de Formación Farmacéutica / Número de Personal'],
+            'KPI-29' => ['resp' => 'Dra. Elena Ramos', 'area' => 'Gestión de Talento & Capacitación', 'freq' => 'Semestral', 'base' => 75.0, 'formula' => '(Colaboradores Certificados en Farmacovigilancia / Total Colaboradores) × 100'],
+            'KPI-30' => ['resp' => 'Lic. Víctor Hugo Quispe', 'area' => 'Capacitación Técnica & Salud', 'freq' => 'Trimestral', 'base' => 70.0, 'formula' => '(Competencias Técnicas Aprobadas / Total Competencias Evaluadas) × 100'],
+            'KPI-31' => ['resp' => 'Lic. Melissa Barreto', 'area' => 'Cultura & Bienestar Organizacional', 'freq' => 'Semestral', 'base' => 72.0, 'formula' => 'Puntaje Promedio General Encuesta de Clima Laboral y Salud Ocupacional (%)'],
+            'KPI-32' => ['resp' => 'Dra. Elena Ramos', 'area' => 'Gestión de Talento & Capacitación', 'freq' => 'Mensual', 'base' => 14.0, 'formula' => '(Renuncias Involuntarias de Químicos y Técnicos / Plantilla Promedio) × 100'],
+            'KPI-33' => ['resp' => 'Lic. Melissa Barreto', 'area' => 'Cultura & Bienestar Organizacional', 'freq' => 'Anual', 'base' => 85.0, 'formula' => '(Evaluaciones de Desempeño Efectuadas / Total Personal Programado) × 100'],
+            'KPI-34' => ['resp' => 'Lic. Igarlos Mamani', 'area' => 'Innovación Tecnológica & Sistemas', 'freq' => 'Trimestral', 'base' => 70.0, 'formula' => '(Transacciones Realizadas en MediZano POS / Total Transacciones) × 100'],
+            'KPI-35' => ['resp' => 'Lic. Igarlos Mamani', 'area' => 'Innovación Tecnológica & Sistemas', 'freq' => 'Trimestral', 'base' => 97.0, 'formula' => '(Minutos Operativos sin Interrupción de Sistema / Minutos Programados) × 100'],
+            'KPI-36' => ['resp' => 'Lic. Víctor Hugo Quispe', 'area' => 'Innovación y Calidad', 'freq' => 'Trimestral', 'base' => 6.0, 'formula' => 'Conteo anual de propuestas del personal implementadas para optimizar la atención']
         ];
 
         $stmtObj = $pdo->prepare("INSERT INTO objectives (id, perspective_id, name, full_name, description, priority, weight, status, leader) VALUES (?, ?, ?, ?, ?, ?, ?, 'Activo', ?)");
         foreach ($data['objectives'] as $obj) {
             $leaderMap = [
-                'OBJ-F1' => 'Lic. Carlos Mendoza (Finanzas)',
-                'OBJ-F2' => 'Ing. Roberto Benítez (Comercial)',
-                'OBJ-F3' => 'Mg. Patricia Valdivia (Costos)',
-                'OBJ-C1' => 'Lic. Camila Paredes (CX)',
-                'OBJ-C2' => 'Mg. Vanessa Rivas (Customer Success)',
-                'OBJ-C3' => 'Lic. Martín Velásquez (Ventas)',
-                'OBJ-P1' => 'Ing. Sofía Morales (Operaciones)',
-                'OBJ-P2' => 'Ing. Diego Alarcón (Producto & TI)',
-                'OBJ-P3' => 'Ing. Jorge Navarro (Logística)',
-                'OBJ-A1' => 'Dra. Elena Ramos (Talento)',
-                'OBJ-A2' => 'Lic. Melissa Barreto (Cultura)',
-                'OBJ-A3' => 'Lic. Víctor Hugo Quispe (Innovación)'
+                'OBJ-F1' => 'Lic. Igarlos Mamani (Finanzas & Pagos)',
+                'OBJ-F2' => 'Q.F. Kenyi Calsin (Ventas & Dispensación)',
+                'OBJ-F3' => 'Q.F. Aldo Calla (Farmacología & Stock)',
+                'OBJ-C1' => 'Lic. Camila Paredes (Atención al Paciente)',
+                'OBJ-C2' => 'Q.F. Kenyi Calsin (Pacientes Crónicos)',
+                'OBJ-C3' => 'Lic. Juan Chambilla (Facturación & Acceso)',
+                'OBJ-P1' => 'Q.F. Kenyi Calsin (Dirección Técnica)',
+                'OBJ-P2' => 'Q.F. Aldo Calla (Control FEFO & Almacén)',
+                'OBJ-P3' => 'Lic. Juan Chambilla (Proveedores & Laboratorios)',
+                'OBJ-A1' => 'Dra. Elena Ramos (Talento & Capacitación)',
+                'OBJ-A2' => 'Lic. Melissa Barreto (Bienestar & Clima)',
+                'OBJ-A3' => 'Lic. Igarlos Mamani (Sistemas & MediZano POS)'
             ];
-            $leader = $leaderMap[$obj['id']] ?? 'Dirección General';
+            $leader = $leaderMap[$obj['id']] ?? 'Dirección Técnica MediZano';
 
             $stmtObj->execute([
                 $obj['id'],
                 $obj['perspective'],
                 $obj['name'],
                 $obj['fullName'],
-                "Objetivo estratégico oficial de TechPeru SAC: {$obj['fullName']}",
+                "Objetivo estratégico oficial de Botica MediZano: {$obj['fullName']}",
                 'Alta',
                 100,
                 $leader
@@ -199,21 +199,21 @@ function seedDatabase(PDO $pdo): void {
             $stmtMeas->execute([$kpi['id'], '2025-Acum', '2025-10-15', $m3Val, $pct3, $kpi['action'], $meta['resp']]);
         }
 
-        // 6. 12 Iniciativas estratégicas oficiales
+        // 6. 12 Iniciativas estratégicas oficiales (Botica MediZano)
         $stmtInit = $pdo->prepare("INSERT INTO initiatives (id, objective_id, kpi_id, name, leader, budget, start_date, end_date, progress_pct, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $initiatives = [
-            ['INI-01', 'OBJ-F1', 'KPI-02', 'Plan integral de reducción de gastos operativos y eficiencia EBITDA Q3-Q4', 'Lic. Carlos Mendoza', 180000, '2025-01-15', '2025-11-30', 78, 'En ejecución'],
-            ['INI-02', 'OBJ-F2', 'KPI-04', 'Aceleración de pipeline comercial corporativo y campañas de upsell', 'Ing. Roberto Benítez', 120000, '2025-02-01', '2025-12-15', 65, 'En ejecución'],
-            ['INI-03', 'OBJ-F3', 'KPI-08', 'Optimización de canales de captación digital y reducción de CAC', 'Lic. Andrea Gallardo', 95000, '2025-03-01', '2025-10-31', 70, 'En ejecución'],
-            ['INI-04', 'OBJ-C1', 'KPI-12', 'Creación de equipo dedicado de soporte nivel 2 y resolución en < 2 días', 'Ing. Javier Bustamante', 85000, '2025-02-15', '2025-09-30', 82, 'En ejecución'],
-            ['INI-05', 'OBJ-C2', 'KPI-15', 'Implementación de unidad de Customer Success y retención de cuentas clave', 'Mg. Vanessa Rivas', 140000, '2025-01-10', '2025-11-15', 75, 'En ejecución'],
-            ['INI-06', 'OBJ-C3', 'KPI-16', 'Expansión de fuerza de ventas y desarrollo de mercado en regiones', 'Lic. Martín Velásquez', 160000, '2025-03-15', '2025-12-20', 60, 'En ejecución'],
-            ['INI-07', 'OBJ-P1', 'KPI-20', 'Programa de control de calidad por etapas y reducción de defectos', 'Ing. Raúl Espinoza', 110000, '2025-02-01', '2025-10-30', 68, 'En ejecución'],
-            ['INI-08', 'OBJ-P2', 'KPI-23', 'Adopción de metodología ágil y aceleración de time-to-market en productos', 'Ing. Diego Alarcón', 130000, '2025-01-20', '2025-11-30', 70, 'En ejecución'],
-            ['INI-09', 'OBJ-P3', 'KPI-26', 'Sistema de evaluación mensual y renegociación de SLAs con proveedores', 'Ing. Jorge Navarro', 75000, '2025-04-01', '2025-10-15', 85, 'En ejecución'],
-            ['INI-10', 'OBJ-A1', 'KPI-28', 'Programa obligatorio de certificación técnica y plan de carrera por áreas', 'Dra. Elena Ramos', 90000, '2025-02-01', '2025-11-15', 72, 'En ejecución'],
-            ['INI-11', 'OBJ-A2', 'KPI-32', 'Revisión de esquema de compensación y plan de retención de talento clave', 'Lic. Melissa Barreto', 105000, '2025-03-01', '2025-12-10', 64, 'En ejecución'],
-            ['INI-12', 'OBJ-A3', 'KPI-36', 'Implementación de plataforma digital de ideas de mejora continua e innovación', 'Lic. Víctor Hugo Quispe', 80000, '2025-02-15', '2025-09-30', 90, 'En ejecución']
+            ['INI-01', 'OBJ-F1', 'KPI-02', 'Plan de optimización de márgenes y convenios con laboratorios farmacéuticos', 'Lic. Igarlos Mamani', 150000, '2025-01-15', '2025-11-30', 82, 'En ejecución'],
+            ['INI-02', 'OBJ-F2', 'KPI-04', 'Campaña de venta asistida y dispensación de bioequivalentes de calidad', 'Q.F. Kenyi Calsin', 110000, '2025-02-01', '2025-12-15', 70, 'En ejecución'],
+            ['INI-03', 'OBJ-F3', 'KPI-07', 'Protocolo estricto de rotación FEFO para reducir mermas por caducidad en mostrador', 'Q.F. Aldo Calla', 95000, '2025-01-10', '2025-10-31', 88, 'En ejecución'],
+            ['INI-04', 'OBJ-C1', 'KPI-12', 'Implementación de caja rápida y checkout digital para reducir colas en mostrador', 'Lic. Juan Chambilla', 80000, '2025-02-15', '2025-09-30', 85, 'En ejecución'],
+            ['INI-05', 'OBJ-C2', 'KPI-13', 'Programa de adherencia y entrega programada para pacientes con medicación crónica', 'Q.F. Kenyi Calsin', 130000, '2025-01-20', '2025-11-15', 79, 'En ejecución'],
+            ['INI-06', 'OBJ-C3', 'KPI-18', 'Despliegue del canal de delivery farmacéutico con trazabilidad de despacho', 'Lic. Camila Paredes', 140000, '2025-03-15', '2025-12-20', 65, 'En ejecución'],
+            ['INI-07', 'OBJ-P1', 'KPI-19', 'Auditoría interna y certificación en Buenas Prácticas de Dispensación (BPD Digemid)', 'Q.F. Kenyi Calsin', 105000, '2025-02-01', '2025-10-30', 92, 'En ejecución'],
+            ['INI-08', 'OBJ-P1', 'KPI-20', 'Protocolo de doble chequeo de dosis y fármaco antes de entrega al paciente', 'Q.F. Aldo Calla', 75000, '2025-01-25', '2025-11-30', 74, 'En ejecución'],
+            ['INI-09', 'OBJ-P3', 'KPI-26', 'Integración de órdenes de compra automáticas con droguerías y laboratorios aliados', 'Lic. Juan Chambilla', 85000, '2025-04-01', '2025-10-15', 86, 'En ejecución'],
+            ['INI-10', 'OBJ-A1', 'KPI-28', 'Programa continuo de formación en farmacovigilancia e interacciones terapéuticas', 'Dra. Elena Ramos', 95000, '2025-02-01', '2025-11-15', 78, 'En ejecución'],
+            ['INI-11', 'OBJ-A2', 'KPI-32', 'Plan de bienestar laboral e incentivos por cumplimiento de metas en botica', 'Lic. Melissa Barreto', 100000, '2025-03-01', '2025-12-10', 68, 'En ejecución'],
+            ['INI-12', 'OBJ-A3', 'KPI-34', 'Adopción total y estabilización del ecosistema distribuido MediZano POS', 'Lic. Igarlos Mamani', 120000, '2025-02-15', '2025-09-30', 90, 'En ejecución']
         ];
         foreach ($initiatives as $init) {
             $stmtInit->execute($init);
@@ -222,17 +222,19 @@ function seedDatabase(PDO $pdo): void {
         // 7. Configuraciones
         $stmtSet = $pdo->prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
         $stmtSet->execute(['period', '2025']);
-        $stmtSet->execute(['org_name', 'TechPeru SAC']);
-        $stmtSet->execute(['org_desc', 'Balanced Scorecard Oficial 2025 · PHP 8.3 & SQLite Enterprise']);
+        $stmtSet->execute(['org_name', 'Botica MediZano']);
+        $stmtSet->execute(['org_desc', 'Balanced Scorecard Farmacéutico · PHP 8.3 & SQLite Enterprise']);
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-        $pdo->exec("INSERT OR IGNORE INTO system_settings (key, value) VALUES 
-            ('company_name', 'TechPeru SAC'),
-            ('bsc_title', 'Balanced Scorecard 2025'),
-            ('strategic_period', 'Plan Estratégico · 2025')");
+        $pdo->exec("INSERT OR REPLACE INTO system_settings (key, value) VALUES 
+            ('company_name', 'Botica MediZano'),
+            ('bsc_title', 'Balanced Scorecard 2025-2026'),
+            ('strategic_period', 'Plan Estratégico Farmacéutico · 2025'),
+            ('mission', 'Garantizar a la comunidad el acceso oportuno, seguro y accesible a medicamentos y productos de salud de alta calidad, brindando una atención farmacéutica profesional, ética y personalizada, respaldada por tecnología de vanguardia y rigurosa trazabilidad sanitaria.'),
+            ('vision', 'Consolidarnos al 2026 como la botica y plataforma farmacéutica líder en dispensación digital, control estricto de calidad FEFO y excelencia en el cuidado de la salud en el Perú.')");
 
         // 8. Log de inicio
-        logActivity($pdo, 'SEED_DATABASE', 'SYSTEM', 'ALL', 'Base de datos inicializada con 12 objetivos, 36 KPIs y responsables oficiales del Excel TechPeru SAC 2025.', 'u1', 'Sistema');
+        logActivity($pdo, 'SEED_DATABASE', 'SYSTEM', 'ALL', 'Base de datos inicializada con 12 objetivos, 36 KPIs y responsables de Botica MediZano.', 'u1', 'Sistema');
 
         $pdo->commit();
     } catch (Exception $e) {
