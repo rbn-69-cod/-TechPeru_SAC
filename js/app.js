@@ -25,11 +25,48 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   let currentDashboardData = null;
   let pendingKpiStatus = "";
 
+  // ========================================================
+  // SISTEMA DE ICONOS LUCIDE SVG PROFESIONAL
+  // ========================================================
+  const ICONS = {
+    dashboard: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>`,
+    map: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>`,
+    target: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
+    kpi: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>`,
+    measure: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>`,
+    initiatives: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>`,
+    reports: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/></svg>`,
+    admin: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
+    bell: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
+    collapse: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>`,
+    expand: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m13 9 3 3-3 3"/></svg>`,
+    edit: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`,
+    logout: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>`,
+    search: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+    download: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`,
+    plus: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
+    users: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    gauge: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>`,
+    activity: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    check: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`,
+    alert: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>`,
+    danger: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>`,
+    table: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>`,
+    quadrants: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>`,
+    chart: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>`,
+    financiera: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+    clientes: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    procesos: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+    aprendizaje: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>`,
+    globe: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+    x: `<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>`
+  };
+
   const perspectives = {
-    financiera: { label: "Financiera", title: "💰 PERSPECTIVA FINANCIERA", color: "#1f3864", soft: "#edf4ff", icon: "💰" },
-    clientes: { label: "Clientes", title: "👥 PERSPECTIVA DE CLIENTES", color: "#1e4d2b", soft: "#eaf8f1", icon: "👥" },
-    procesos: { label: "Procesos internos", title: "🔧 PERSPECTIVA DE PROCESOS INTERNOS", color: "#9a4b08", soft: "#fff5e6", icon: "🔧" },
-    aprendizaje: { label: "Aprendizaje y crecimiento", title: "📚 PERSPECTIVA DE APRENDIZAJE Y CRECIMIENTO", color: "#4a2373", soft: "#f2edff", icon: "📚" }
+    financiera: { label: "Financiera", title: "PERSPECTIVA FINANCIERA", color: "#1d4ed8", soft: "#eff6ff", iconKey: "financiera" },
+    clientes: { label: "Clientes", title: "PERSPECTIVA DE CLIENTES", color: "#0d9488", soft: "#f0fdf4", iconKey: "clientes" },
+    procesos: { label: "Procesos internos", title: "PERSPECTIVA DE PROCESOS INTERNOS", color: "#6366f1", soft: "#f5f3ff", iconKey: "procesos" },
+    aprendizaje: { label: "Aprendizaje y crecimiento", title: "PERSPECTIVA DE APRENDIZAJE Y CRECIMIENTO", color: "#d97706", soft: "#fffbeb", iconKey: "aprendizaje" }
   };
 
   const pageTitles = {
@@ -78,10 +115,11 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
 
   function pageHead(title, subtitle, actionsHtml = "") {
     return `
-    <div class="page-head">
-      <div>
-        <h1>${escapeHtml(title)}</h1>
-        <p>${escapeHtml(subtitle)}</p>
+    <div class="page-head modern-page-head">
+      <div class="page-head-titles">
+        <div class="page-head-badge"><span class="badge-dot"></span> PLAN ESTRATÉGICO OFICIAL · TECHPERU SAC 2025</div>
+        <h1 class="page-title">${escapeHtml(title)}</h1>
+        <p class="page-subtitle">${escapeHtml(subtitle)}</p>
       </div>
       <div class="head-actions">${actionsHtml}</div>
     </div>`;
@@ -94,9 +132,12 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   function renderRespChip(name, area) {
     const ini = getInitials(name);
     return `
-      <div class="resp-chip" title="Área: ${escapeHtml(area || '')}">
+      <div class="resp-chip" title="${escapeHtml(name)} · ${escapeHtml(area || '')}">
         <span class="resp-avatar">${escapeHtml(ini)}</span>
-        <span>${escapeHtml(name)}</span>
+        <div class="resp-details">
+          <span class="resp-name">${escapeHtml(name)}</span>
+          ${area ? `<span class="resp-area">${escapeHtml(area)}</span>` : ''}
+        </div>
       </div>
     `;
   }
@@ -191,7 +232,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     const isCollapsed = sidebar.classList.toggle('collapsed');
     shell?.classList.toggle('sidebar-collapsed', isCollapsed);
     const btn = $('#sidebarCollapseBtn');
-    if (btn) btn.textContent = isCollapsed ? '⇥' : '⇤';
+    if (btn) btn.innerHTML = isCollapsed ? ICONS.expand : ICONS.collapse;
     try { localStorage.setItem('bsc_sidebar_collapsed', isCollapsed ? '1' : '0'); } catch (e) {}
   }
 
@@ -208,7 +249,7 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
         $('#sidebar')?.classList.add('collapsed');
         $('#appView')?.classList.add('sidebar-collapsed');
         const btn = $('#sidebarCollapseBtn');
-        if (btn) btn.textContent = '⇥';
+        if (btn) btn.innerHTML = ICONS.expand;
       }
     } catch (e) {}
 
@@ -327,10 +368,10 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
 
     // Configuración y métricas de las 4 Perspectivas
     const perspConfigs = [
-      { id: 'financiera', name: 'Financiera', icon: '💰', color: '#1f3864', softColor: '#eff6ff', tagClass: 'financiera' },
-      { id: 'clientes', name: 'Clientes', icon: '👥', color: '#1e4d2b', softColor: '#f0fdf4', tagClass: 'clientes' },
-      { id: 'procesos', name: 'Procesos Internos', icon: '🔧', color: '#9a4b08', softColor: '#fffbeb', tagClass: 'procesos' },
-      { id: 'aprendizaje', name: 'Aprendizaje y Crecimiento', icon: '📚', color: '#4a2373', softColor: '#faf5ff', tagClass: 'aprendizaje' }
+      { id: 'financiera', name: 'Financiera', iconKey: 'financiera', color: '#1d4ed8', softColor: '#eff6ff', tagClass: 'financiera' },
+      { id: 'clientes', name: 'Clientes', iconKey: 'clientes', color: '#0d9488', softColor: '#f0fdf4', tagClass: 'clientes' },
+      { id: 'procesos', name: 'Procesos Internos', iconKey: 'procesos', color: '#6366f1', softColor: '#f5f3ff', tagClass: 'procesos' },
+      { id: 'aprendizaje', name: 'Aprendizaje y Crecimiento', iconKey: 'aprendizaje', color: '#d97706', softColor: '#fffbeb', tagClass: 'aprendizaje' }
     ];
 
     const perspCardsHtml = perspConfigs.map(p => {
@@ -342,25 +383,36 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       const badCount = pKpis.filter(k => Number(k.compliance_pct) < 75).length;
       const isActive = activeExcelFilter === p.id;
       const barColor = avg >= 90 ? '#16a34a' : (avg >= 75 ? '#d97706' : '#dc2626');
+      const statusText = avg >= 90 ? 'Logrado' : (avg >= 75 ? 'En Riesgo' : 'Crítico');
+      const statusKey = avg >= 90 ? 'good' : (avg >= 75 ? 'warn' : 'bad');
 
       return `
         <div class="persp-summary-card ${isActive ? 'active' : ''}" data-persp-card="${p.id}" style="--accent:${p.color}">
+          <div class="persp-accent-top" style="background:${p.color}"></div>
           <div class="persp-card-header">
-            <span class="persp-card-title">${p.icon} ${p.name}</span>
-            <span class="tag" style="background:${p.softColor};color:${p.color};font-weight:700">${count} KPIs</span>
+            <div class="persp-header-left">
+              <span class="persp-icon-box" style="background:${p.softColor};color:${p.color}">
+                ${ICONS[p.iconKey]}
+              </span>
+              <strong class="persp-card-title">${p.name}</strong>
+            </div>
+            <span class="persp-count-pill" style="background:${p.softColor};color:${p.color}">${count} KPIs</span>
           </div>
-          <div class="persp-card-pct" style="color:${barColor}">${avg}%</div>
+          <div class="persp-metric-row">
+            <span class="persp-card-pct" style="color:${barColor}">${avg}%</span>
+            <span class="status-chip ${statusKey}"><i class="dot"></i> ${statusText}</span>
+          </div>
           <div class="persp-card-prog">
             <div class="persp-card-prog-fill" style="width:${Math.min(100, avg)}%;background:${barColor}"></div>
           </div>
           <div class="persp-card-meta">
-            <span>3 Objetivos</span>
-            <span>${isActive ? '<b>Filtro activo</b>' : 'Clic para filtrar'}</span>
+            <span class="meta-objectives"><span class="meta-bullet">▪</span> 3 Objetivos Estratégicos</span>
+            <span class="meta-filter-action">${isActive ? '<b class="active-badge">Filtro activo ✕</b>' : 'Clic para filtrar'}</span>
           </div>
           <div class="persp-card-breakdown">
-            <span style="color:#16a34a">● ${goodCount} logrados</span>
-            <span style="color:#d97706">● ${warnCount} riesgo</span>
-            <span style="color:#dc2626">● ${badCount} críticos</span>
+            <span class="breakdown-pill good"><i class="dot"></i> ${goodCount} logrados</span>
+            <span class="breakdown-pill warn"><i class="dot"></i> ${warnCount} riesgo</span>
+            <span class="breakdown-pill bad"><i class="dot"></i> ${badCount} críticos</span>
           </div>
         </div>
       `;
@@ -377,88 +429,170 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
 
     container.innerHTML = `
       ${pageHead("BALANCED SCORECARD — TechPeru SAC | 2025", "Tablero Estratégico Ejecutivo · Persistencia en Base de Datos SQLite · 4 Perspectivas · 36 KPIs", `
-        <button class="btn" id="btnExportDashCSV">📥 Exportar Reporte CSV</button>
-        <button class="btn primary" id="btnNewMeasurement">＋ Registrar Medición</button>
+        <button class="btn btn-secondary" id="btnExportDashCSV">
+          ${ICONS.download} <span>Exportar Reporte CSV</span>
+        </button>
+        <button class="btn btn-primary" id="btnNewMeasurement">
+          ${ICONS.plus} <span>Registrar Medición</span>
+        </button>
       `)}
 
       <!-- 4 TARJETAS KPI EJECUTIVAS -->
       <section class="grid metric-grid">
-        <div class="metric-card">
-          <div class="metric-top"><span>CUMPLIMIENTO GLOBAL</span><span class="metric-icon">◎</span></div>
-          <div class="metric-value" style="color:${g.avg_pct >= 90 ? '#16845b' : g.avg_pct >= 75 ? '#b97708' : '#c23a42'}">
-            ${fmt(g.avg_pct)}%
+        <div class="metric-card metric-card-global">
+          <div class="metric-top">
+            <span class="metric-label">CUMPLIMIENTO GLOBAL</span>
+            <span class="metric-icon-box blue">${ICONS.gauge}</span>
+          </div>
+          <div class="metric-main-row">
+            <div class="metric-value" style="color:${g.avg_pct >= 90 ? '#16a34a' : g.avg_pct >= 75 ? '#d97706' : '#dc2626'}">
+              ${fmt(g.avg_pct)}%
+            </div>
+            <span class="status-chip ${g.status_key}">
+              <i class="dot"></i> ${g.status_text}
+            </span>
+          </div>
+          <div class="metric-bar-wrap">
+            <div class="metric-bar-fill" style="width:${Math.min(100, g.avg_pct)}%;background:${g.avg_pct >= 90 ? '#16a34a' : g.avg_pct >= 75 ? '#d97706' : '#dc2626'}"></div>
           </div>
           <div class="metric-foot">
-            <span class="status ${g.status_key}">${g.status_text}</span>
-            <span>${g.total} KPIs evaluados</span>
+            <span class="metric-foot-primary">${g.total} KPIs evaluados</span>
+            <span class="metric-foot-secondary">Base SQLite activa</span>
+          </div>
+        </div>
+
+        <div class="metric-card metric-card-health">
+          <div class="metric-top">
+            <span class="metric-label">SALUD DE INDICADORES</span>
+            <span class="metric-icon-box slate">${ICONS.activity}</span>
+          </div>
+          <div class="metric-main-row">
+            <div class="metric-value">${g.total}</div>
+            <span class="metric-sub-label">Total Indicadores</span>
+          </div>
+          <div class="metric-stacked-bar">
+            <div class="stack-seg good" style="width:${(g.logrado/g.total*100).toFixed(1)}%" title="${g.logrado} Logrados"></div>
+            <div class="stack-seg warn" style="width:${(g.riesgo/g.total*100).toFixed(1)}%" title="${g.riesgo} En Riesgo"></div>
+            <div class="stack-seg bad" style="width:${(g.critico/g.total*100).toFixed(1)}%" title="${g.critico} Críticos"></div>
+          </div>
+          <div class="metric-foot-pills">
+            <span class="status-chip good"><i class="dot"></i> ${g.logrado} Logrados</span>
+            <span class="status-chip warn"><i class="dot"></i> ${g.riesgo} Riesgo</span>
+            <span class="status-chip bad"><i class="dot"></i> ${g.critico} Críticos</span>
           </div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-top"><span>SALUD DE INDICADORES</span><span class="metric-icon">▥</span></div>
-          <div class="metric-value">${g.total}</div>
+          <div class="metric-top">
+            <span class="metric-label">OBJETIVOS ESTRATÉGICOS</span>
+            <span class="metric-icon-box green">${ICONS.target}</span>
+          </div>
+          <div class="metric-main-row">
+            <div class="metric-value">${res.objectives.length}</div>
+            <span class="status-chip neutral">100% Definidos</span>
+          </div>
+          <div class="metric-info-text">
+            <span>Alineación estratégica transversal</span>
+          </div>
           <div class="metric-foot">
-            <span class="status good">${g.logrado} Logrados</span>
-            <span class="status warn">${g.riesgo} Riesgo</span>
-            <span class="status bad">${g.critico} Críticos</span>
+            <span class="metric-foot-primary">4 Perspectivas BSC</span>
+            <span class="metric-foot-secondary">3 por perspectiva</span>
           </div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-top"><span>OBJETIVOS ESTRATÉGICOS</span><span class="metric-icon">⌘</span></div>
-          <div class="metric-value">${res.objectives.length}</div>
-          <div class="metric-foot"><span class="trend-up">Seguimiento Anual</span><span>4 Perspectivas BSC</span></div>
-        </div>
-
-        <div class="metric-card">
-          <div class="metric-top"><span>LIDERAZGO Y GESTIÓN</span><span class="metric-icon">👤</span></div>
-          <div class="metric-value">${res.responsibles.length}</div>
-          <div class="metric-foot"><span class="trend-up">● Líderes Asignados</span><span>100% de KPIs con Responsable</span></div>
+          <div class="metric-top">
+            <span class="metric-label">LIDERAZGO Y GESTIÓN</span>
+            <span class="metric-icon-box purple">${ICONS.users}</span>
+          </div>
+          <div class="metric-main-row">
+            <div class="metric-value">${res.responsibles.length}</div>
+            <span class="status-chip blue">Líderes de Área</span>
+          </div>
+          <div class="metric-info-text">
+            <span>Rendición de cuentas continua</span>
+          </div>
+          <div class="metric-foot">
+            <span class="metric-foot-primary">100% Asignación</span>
+            <span class="metric-foot-secondary">Responsable asignado</span>
+          </div>
         </div>
       </section>
 
       <!-- 4 PERSPECTIVAS ESTRATÉGICAS DEL BSC (INTERACTIVAS) -->
-      <div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-        <strong style="font-size:13px;color:#1e293b;letter-spacing:-0.02em">Las 4 Perspectivas del Balanced Scorecard (Haz clic en una para filtrar)</strong>
-        ${activeExcelFilter ? `<button class="btn small soft" id="btnResetPerspFilter">✕ Quitar filtro (${activeExcelFilter})</button>` : ""}
+      <div class="section-title-row">
+        <div class="section-title-left">
+          <h2 class="section-heading">Perspectivas Estratégicas del Balanced Scorecard</h2>
+          <span class="section-subheading">Haz clic en una tarjeta para filtrar indicadores o visualizar metas específicas</span>
+        </div>
+        ${activeExcelFilter ? `<button class="btn-clear-filter-pill" id="btnResetPerspFilter">${ICONS.x} <span>Quitar filtro (${activeExcelFilter})</span></button>` : ""}
       </div>
       <section class="persp-cards-grid">
         ${perspCardsHtml}
       </section>
 
-      <!-- BARRA DE HERRAMIENTAS Y FILTROS INTUITIVOS -->
+      <!-- BARRA DE HERRAMIENTAS Y FILTROS EN 2 NIVELES -->
       <section class="modern-toolbar">
         <div class="toolbar-top-row">
-          <div class="persp-filter-pills">
-            <button class="persp-pill-btn ${!activeExcelFilter ? 'active' : ''}" data-filter-persp="">🌐 Todo el BSC (${res.all_kpis.length})</button>
-            <button class="persp-pill-btn ${activeExcelFilter === 'financiera' ? 'active' : ''}" data-filter-persp="financiera">💰 Financiera (9)</button>
-            <button class="persp-pill-btn ${activeExcelFilter === 'clientes' ? 'active' : ''}" data-filter-persp="clientes">👥 Clientes (9)</button>
-            <button class="persp-pill-btn ${activeExcelFilter === 'procesos' ? 'active' : ''}" data-filter-persp="procesos">🔧 Procesos (9)</button>
-            <button class="persp-pill-btn ${activeExcelFilter === 'aprendizaje' ? 'active' : ''}" data-filter-persp="aprendizaje">📚 Aprendizaje (9)</button>
+          <div class="persp-filter-pills" role="tablist" aria-label="Filtrar por perspectiva">
+            <button class="persp-pill-btn ${!activeExcelFilter ? 'active' : ''}" data-filter-persp="">
+              ${ICONS.globe} <span>Todo el BSC</span> <span class="pill-count">${res.all_kpis.length}</span>
+            </button>
+            <button class="persp-pill-btn ${activeExcelFilter === 'financiera' ? 'active' : ''}" data-filter-persp="financiera">
+              ${ICONS.financiera} <span>Financiera</span> <span class="pill-count">9</span>
+            </button>
+            <button class="persp-pill-btn ${activeExcelFilter === 'clientes' ? 'active' : ''}" data-filter-persp="clientes">
+              ${ICONS.clientes} <span>Clientes</span> <span class="pill-count">9</span>
+            </button>
+            <button class="persp-pill-btn ${activeExcelFilter === 'procesos' ? 'active' : ''}" data-filter-persp="procesos">
+              ${ICONS.procesos} <span>Procesos</span> <span class="pill-count">9</span>
+            </button>
+            <button class="persp-pill-btn ${activeExcelFilter === 'aprendizaje' ? 'active' : ''}" data-filter-persp="aprendizaje">
+              ${ICONS.aprendizaje} <span>Aprendizaje</span> <span class="pill-count">9</span>
+            </button>
           </div>
-          <div class="view-tabs">
-            <button class="view-tab ${dashboardViewMode === 'matriz' ? 'active' : ''}" data-view="matriz">📋 Tabla de Indicadores</button>
-            <button class="view-tab ${dashboardViewMode === 'cuadrantes' ? 'active' : ''}" data-view="cuadrantes">▦ Cuadrantes BSC</button>
-            <button class="view-tab ${dashboardViewMode === 'graficos' ? 'active' : ''}" data-view="graficos">📈 Gráficos</button>
+          <div class="view-tabs" role="group" aria-label="Modo de visualización">
+            <button class="view-tab ${dashboardViewMode === 'matriz' ? 'active' : ''}" data-view="matriz" title="Vista Matriz Oficial">
+              ${ICONS.table} <span>Tabla de Indicadores</span>
+            </button>
+            <button class="view-tab ${dashboardViewMode === 'cuadrantes' ? 'active' : ''}" data-view="cuadrantes" title="Vista Cuadrantes BSC">
+              ${ICONS.quadrants} <span>Cuadrantes BSC</span>
+            </button>
+            <button class="view-tab ${dashboardViewMode === 'graficos' ? 'active' : ''}" data-view="graficos" title="Vista Gráficos Ejecutivos">
+              ${ICONS.chart} <span>Gráficos</span>
+            </button>
           </div>
         </div>
 
         <div class="toolbar-search-row">
           <div class="search-input-wrap">
-            <span class="search-icon-fixed">⌕</span>
-            <input type="search" id="kpiSearchInput" value="${escapeHtml(kpiSearchTerm)}" placeholder="Buscar KPI por código, nombre, objetivo, líder responsable...">
+            <span class="search-icon-fixed">${ICONS.search}</span>
+            <input type="search" id="kpiSearchInput" class="search-input-field" value="${escapeHtml(kpiSearchTerm)}" placeholder="Buscar por código (ej. KPI-01), nombre, objetivo o líder responsable...">
+            ${kpiSearchTerm ? `<button class="search-clear-btn" id="btnSearchClear" title="Limpiar búsqueda">${ICONS.x}</button>` : ""}
           </div>
-          <div class="status-filters">
+          <div class="status-filters" role="group" aria-label="Filtrar por estado">
             <button class="status-pill-btn ${!activeStatusFilter ? 'active' : ''}" data-filter-status="">Todos</button>
-            <button class="status-pill-btn ${activeStatusFilter === 'good' ? 'active' : ''}" data-filter-status="good">✅ Logrados (${g.logrado})</button>
-            <button class="status-pill-btn ${activeStatusFilter === 'warn' ? 'active' : ''}" data-filter-status="warn">⚠️ En Riesgo (${g.riesgo})</button>
-            <button class="status-pill-btn ${activeStatusFilter === 'bad' ? 'active' : ''}" data-filter-status="bad">❌ Críticos (${g.critico})</button>
+            <button class="status-pill-btn good ${activeStatusFilter === 'good' ? 'active' : ''}" data-filter-status="good">
+              <i class="dot"></i> <span>Logrados (${g.logrado})</span>
+            </button>
+            <button class="status-pill-btn warn ${activeStatusFilter === 'warn' ? 'active' : ''}" data-filter-status="warn">
+              <i class="dot"></i> <span>En Riesgo (${g.riesgo})</span>
+            </button>
+            <button class="status-pill-btn bad ${activeStatusFilter === 'bad' ? 'active' : ''}" data-filter-status="bad">
+              <i class="dot"></i> <span>Críticos (${g.critico})</span>
+            </button>
           </div>
-          <select id="dashFilterResp" class="filter-select" style="min-width:210px">
-            <option value="">-- Todos los Responsables (${res.responsibles.length}) --</option>
-            ${res.responsibles.map(r => `<option value="${escapeHtml(r.responsible)}" ${activeRespFilter === r.responsible ? 'selected' : ''}>${escapeHtml(r.responsible)} (${escapeHtml(r.responsible_area)})</option>`).join("")}
-          </select>
-          ${(activeExcelFilter || activeStatusFilter || kpiSearchTerm || activeRespFilter) ? `<button class="btn small soft" id="btnClearAllFilters">✕ Limpiar filtros</button>` : ""}
+          <div class="filter-select-wrap">
+            <select id="dashFilterResp" class="filter-select">
+              <option value="">-- Todos los Responsables (${res.responsibles.length}) --</option>
+              ${res.responsibles.map(r => `<option value="${escapeHtml(r.responsible)}" ${activeRespFilter === r.responsible ? 'selected' : ''}>${escapeHtml(r.responsible)} (${escapeHtml(r.responsible_area)})</option>`).join("")}
+            </select>
+          </div>
+          ${(activeExcelFilter || activeStatusFilter || kpiSearchTerm || activeRespFilter) ? `
+            <button class="btn-clear-all" id="btnClearAllFilters" title="Limpiar todos los filtros">
+              ${ICONS.x} <span>Limpiar filtros</span>
+            </button>
+          ` : ""}
         </div>
       </section>
 
@@ -476,11 +610,11 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   function renderModernKpiTable(kpis) {
     if (!kpis.length) {
       return `
-        <div class="empty-state" style="padding:48px 24px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;text-align:center">
-          <div style="font-size:32px;margin-bottom:8px">🔍</div>
-          <h3 style="margin:0 0 6px;color:#1e293b">No se encontraron indicadores</h3>
-          <p style="color:#64748b;font-size:12px;margin:0 0 16px">Ningún KPI coincide con los criterios de búsqueda o filtros seleccionados.</p>
-          <button class="btn small primary" id="btnResetFiltersEmpty">Restablecer filtros</button>
+        <div class="modern-table-panel empty-panel">
+          <div class="empty-icon-box">${ICONS.search}</div>
+          <h3 class="empty-title">No se encontraron indicadores</h3>
+          <p class="empty-subtitle">Ningún KPI coincide con los criterios de búsqueda o filtros seleccionados.</p>
+          <button class="btn primary small" id="btnResetFiltersEmpty">Restablecer filtros</button>
         </div>
       `;
     }
@@ -488,53 +622,62 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     const rows = kpis.map(k => {
       const pct = Number(k.compliance_pct);
       const statusClass = pct >= 90 ? 'good' : (pct >= 75 ? 'warn' : 'bad');
-      const barFillClass = pct >= 90 ? 'good' : (pct >= 75 ? 'warn' : 'bad');
+      const barFillColor = pct >= 90 ? '#16a34a' : (pct >= 75 ? '#d97706' : '#dc2626');
+      const statusLabel = pct >= 90 ? 'Logrado' : (pct >= 75 ? 'En Riesgo' : 'Crítico');
 
       return `
-        <tr>
-          <td>
+        <tr class="modern-table-row">
+          <td class="col-indicator">
             <div class="kpi-title-block">
-              <strong>${escapeHtml(k.id)} — ${escapeHtml(k.name)}</strong>
-              <small>${escapeHtml(k.objective_full_name || k.objective_name || '')}</small>
+              <div class="kpi-meta-tags">
+                <span class="kpi-code-pill">${escapeHtml(k.id)}</span>
+                ${k.objective_id ? `<span class="kpi-obj-pill">${escapeHtml(k.objective_id)}</span>` : ''}
+              </div>
+              <strong class="kpi-headline">${escapeHtml(k.name)}</strong>
+              <small class="kpi-objective-desc">${escapeHtml(k.objective_full_name || k.objective_name || '')}</small>
             </div>
           </td>
-          <td>
+          <td class="col-perspective">
             <span class="persp-tag ${k.perspective_id}">
               ${escapeHtml(k.perspective_name || k.perspective_id)}
             </span>
           </td>
-          <td>
+          <td class="col-responsible">
             ${renderRespChip(k.responsible, k.responsible_area)}
           </td>
-          <td style="white-space:nowrap">
-            <b>${fmt(k.target)}</b> <small class="muted">${escapeHtml(k.unit)}</small>
+          <td class="col-target">
+            <span class="target-number">${fmt(k.target)}</span>
+            <span class="unit-badge">${escapeHtml(k.unit)}</span>
           </td>
-          <td style="white-space:nowrap">
+          <td class="col-current-real">
             <button class="kpi-num-btn" data-action="quick-measure" data-id="${escapeHtml(k.id)}" title="Haz clic para registrar nueva medición en SQLite">
-              ${fmt(k.current_real)} ✎
+              <span class="num-val">${fmt(k.current_real)}</span>
+              <span class="edit-icon">${ICONS.edit}</span>
             </button>
           </td>
-          <td>
+          <td class="col-progress">
             <div class="kpi-prog-wrap">
               <div class="kpi-prog-bar">
-                <div class="fill ${barFillClass}" style="width:${Math.min(100, Math.max(5, pct))}%"></div>
+                <div class="kpi-prog-fill" style="width:${Math.min(100, Math.max(5, pct))}%;background:${barFillColor}"></div>
               </div>
-              <strong style="color:${pct >= 90 ? '#15803d' : (pct >= 75 ? '#b45309' : '#b91c1c')};font-size:11.5px">
+              <strong class="prog-pct" style="color:${barFillColor}">
                 ${fmt(pct)}%
               </strong>
             </div>
           </td>
-          <td>
+          <td class="col-status">
             <span class="kpi-status-badge ${statusClass}">
-              ${escapeHtml(k.status)}
+              <i class="dot"></i> ${statusLabel}
             </span>
           </td>
-          <td style="max-width:240px;font-size:11px;color:#475569;line-height:1.4">
-            ${escapeHtml(k.action_recommended)}
+          <td class="col-action-rec">
+            <div class="action-rec-box" title="${escapeHtml(k.action_recommended || '')}">
+              ${escapeHtml(k.action_recommended || 'Monitoreo activo.')}
+            </div>
           </td>
-          <td>
-            <button class="btn small soft" data-action="quick-measure" data-id="${escapeHtml(k.id)}" title="Registrar resultado">
-              + Medir
+          <td class="col-action-btn">
+            <button class="btn-table-measure" data-action="quick-measure" data-id="${escapeHtml(k.id)}" title="Registrar resultado en SQLite">
+              ${ICONS.plus} <span>Medir</span>
             </button>
           </td>
         </tr>
@@ -544,25 +687,32 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     return `
       <div class="modern-table-panel">
         <div class="modern-table-header-info">
-          <div>
-            <strong style="font-size:13px;color:#0f172a">Matriz Oficial de Indicadores (${kpis.length} KPIs evaluados)</strong>
-            <p style="font-size:11px;color:#64748b;margin:2px 0 0">Datos oficiales almacenados en base de datos SQLite · Haz clic en el valor con ✎ o en "+ Medir" para actualizar cualquier resultado.</p>
+          <div class="header-info-titles">
+            <div class="header-badge-row">
+              <strong class="panel-main-title">Matriz Oficial de Indicadores</strong>
+              <span class="badge-sqlite-live"><i class="pulse-dot"></i> Base SQLite Activa</span>
+            </div>
+            <p class="panel-sub-desc">
+              Mostrando <b>${kpis.length}</b> indicadores. Haz clic sobre el valor numérico ✎ o en el botón "Medir" para registrar una actualización.
+            </p>
           </div>
-          <span class="tag" style="background:#eff6ff;color:#1d4ed8;font-weight:700">Base de Datos Activa</span>
+          <div class="header-info-badges">
+            <span class="table-total-count">${kpis.length} KPIs en seguimiento</span>
+          </div>
         </div>
         <div class="table-scroll">
           <table class="modern-kpi-table">
             <thead>
               <tr>
-                <th style="min-width:250px">Indicador & Objetivo</th>
+                <th style="min-width:270px">Indicador & Objetivo</th>
                 <th>Perspectiva</th>
                 <th>Líder Responsable</th>
                 <th>Meta</th>
                 <th>Real Actual</th>
                 <th style="min-width:140px">Progreso</th>
                 <th>Estado</th>
-                <th style="min-width:220px">Acción / Recomendación</th>
-                <th>Acción</th>
+                <th style="min-width:210px">Acción / Recomendación</th>
+                <th style="text-align:right">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -781,6 +931,12 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
         activeStatusFilter = null;
         kpiSearchTerm = "";
         activeRespFilter = null;
+        renderCurrentPage();
+      };
+    }
+    if ($('#btnSearchClear')) {
+      $('#btnSearchClear').onclick = () => {
+        kpiSearchTerm = "";
         renderCurrentPage();
       };
     }
