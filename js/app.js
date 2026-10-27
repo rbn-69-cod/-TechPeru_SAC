@@ -15,6 +15,8 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   let currentPage = "dashboard";
   let dashboardViewMode = "matriz"; // 'matriz', 'cuadrantes', 'graficos'
   let activeExcelFilter = null;
+  let activeStatusFilter = null;
+  let kpiSearchTerm = "";
   let activeRespFilter = null;
   let charts = {};
   let measurementOffset = 0;
@@ -230,16 +232,82 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     }
   }
 
-  // 1. DASHBOARD EJECUTIVO
+  // 1. DASHBOARD EJECUTIVO MODERNO E INTUITIVO
   async function renderDashboard(container) {
     const url = activeRespFilter ? `api/dashboard.php?responsible=${encodeURIComponent(activeRespFilter)}` : "api/dashboard.php";
     const res = await apiFetch(url);
     currentDashboardData = res;
     const g = res.global;
 
+    // Filtrar KPIs según perspectiva, estado y término de búsqueda
+    let filteredKpis = res.all_kpis;
+    if (activeExcelFilter) {
+      filteredKpis = filteredKpis.filter(k => k.perspective_id === activeExcelFilter);
+    }
+    if (activeStatusFilter) {
+      filteredKpis = filteredKpis.filter(k => {
+        const p = Number(k.compliance_pct);
+        if (activeStatusFilter === 'good') return p >= 90;
+        if (activeStatusFilter === 'warn') return p >= 75 && p < 90;
+        if (activeStatusFilter === 'bad') return p < 75;
+        return true;
+      });
+    }
+    if (kpiSearchTerm) {
+      const q = kpiSearchTerm.toLowerCase();
+      filteredKpis = filteredKpis.filter(k => 
+        k.name.toLowerCase().includes(q) ||
+        k.id.toLowerCase().includes(q) ||
+        (k.objective_name && k.objective_name.toLowerCase().includes(q)) ||
+        (k.responsible && k.responsible.toLowerCase().includes(q)) ||
+        (k.responsible_area && k.responsible_area.toLowerCase().includes(q))
+      );
+    }
+
+    // Configuración y métricas de las 4 Perspectivas
+    const perspConfigs = [
+      { id: 'financiera', name: 'Financiera', icon: '💰', color: '#1f3864', softColor: '#eff6ff', tagClass: 'financiera' },
+      { id: 'clientes', name: 'Clientes', icon: '👥', color: '#1e4d2b', softColor: '#f0fdf4', tagClass: 'clientes' },
+      { id: 'procesos', name: 'Procesos Internos', icon: '🔧', color: '#9a4b08', softColor: '#fffbeb', tagClass: 'procesos' },
+      { id: 'aprendizaje', name: 'Aprendizaje y Crecimiento', icon: '📚', color: '#4a2373', softColor: '#faf5ff', tagClass: 'aprendizaje' }
+    ];
+
+    const perspCardsHtml = perspConfigs.map(p => {
+      const pKpis = res.all_kpis.filter(k => k.perspective_id === p.id);
+      const count = pKpis.length;
+      const avg = count ? (pKpis.reduce((acc, k) => acc + Number(k.compliance_pct), 0) / count).toFixed(1) : 0;
+      const goodCount = pKpis.filter(k => Number(k.compliance_pct) >= 90).length;
+      const warnCount = pKpis.filter(k => Number(k.compliance_pct) >= 75 && Number(k.compliance_pct) < 90).length;
+      const badCount = pKpis.filter(k => Number(k.compliance_pct) < 75).length;
+      const isActive = activeExcelFilter === p.id;
+      const barColor = avg >= 90 ? '#16a34a' : (avg >= 75 ? '#d97706' : '#dc2626');
+
+      return `
+        <div class="persp-summary-card ${isActive ? 'active' : ''}" data-persp-card="${p.id}" style="--accent:${p.color}">
+          <div class="persp-card-header">
+            <span class="persp-card-title">${p.icon} ${p.name}</span>
+            <span class="tag" style="background:${p.softColor};color:${p.color};font-weight:700">${count} KPIs</span>
+          </div>
+          <div class="persp-card-pct" style="color:${barColor}">${avg}%</div>
+          <div class="persp-card-prog">
+            <div class="persp-card-prog-fill" style="width:${Math.min(100, avg)}%;background:${barColor}"></div>
+          </div>
+          <div class="persp-card-meta">
+            <span>3 Objetivos</span>
+            <span>${isActive ? '<b>Filtro activo</b>' : 'Clic para filtrar'}</span>
+          </div>
+          <div class="persp-card-breakdown">
+            <span style="color:#16a34a">● ${goodCount} logrados</span>
+            <span style="color:#d97706">● ${warnCount} riesgo</span>
+            <span style="color:#dc2626">● ${badCount} críticos</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+
     let contentHtml = "";
     if (dashboardViewMode === "matriz") {
-      contentHtml = renderBscMatrixTable(res.all_kpis, activeExcelFilter);
+      contentHtml = renderModernKpiTable(filteredKpis, res);
     } else if (dashboardViewMode === "cuadrantes") {
       contentHtml = renderQuadrants(res.perspectives);
     } else {
@@ -247,9 +315,9 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     }
 
     container.innerHTML = `
-      ${pageHead("BALANCED SCORECARD — TechPeru SAC | 2025", `4 perspectivas · ${res.objectives.length} objetivos · ${g.total} indicadores`, `
-        <button class="btn" id="btnExportDashCSV">📥 Exportar CSV Oficial</button>
-        <button class="btn primary" id="btnNewMeasurement">＋ Registrar resultado</button>
+      ${pageHead("BALANCED SCORECARD — TechPeru SAC | 2025", "Tablero Estratégico Ejecutivo · Persistencia en Base de Datos SQLite · 4 Perspectivas · 36 KPIs", `
+        <button class="btn" id="btnExportDashCSV">📥 Exportar Reporte CSV</button>
+        <button class="btn primary" id="btnNewMeasurement">＋ Registrar Medición</button>
       `)}
 
       <!-- 4 TARJETAS KPI EJECUTIVAS -->
@@ -266,106 +334,75 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
         </div>
 
         <div class="metric-card">
-          <div class="metric-top"><span>OBJETIVOS ESTRATÉGICOS</span><span class="metric-icon">⌘</span></div>
-          <div class="metric-value">${res.objectives.length}</div>
-          <div class="metric-foot"><span class="trend-up">Seguimiento estratégico</span><span>4 perspectivas</span></div>
-        </div>
-
-        <div class="metric-card">
-          <div class="metric-top"><span>ESTADO DE LOS KPIS</span><span class="metric-icon">▥</span></div>
+          <div class="metric-top"><span>SALUD DE INDICADORES</span><span class="metric-icon">▥</span></div>
           <div class="metric-value">${g.total}</div>
           <div class="metric-foot">
-            <span class="status good">${g.logrado} Logrado</span>
+            <span class="status good">${g.logrado} Logrados</span>
             <span class="status warn">${g.riesgo} Riesgo</span>
-            <span class="status bad">${g.critico} Crítico</span>
+            <span class="status bad">${g.critico} Críticos</span>
           </div>
         </div>
 
         <div class="metric-card">
-          <div class="metric-top"><span>RESPONSABLES ASIGNADOS</span><span class="metric-icon">👤</span></div>
+          <div class="metric-top"><span>OBJETIVOS ESTRATÉGICOS</span><span class="metric-icon">⌘</span></div>
+          <div class="metric-value">${res.objectives.length}</div>
+          <div class="metric-foot"><span class="trend-up">Seguimiento Anual</span><span>4 Perspectivas BSC</span></div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-top"><span>LIDERAZGO Y GESTIÓN</span><span class="metric-icon">👤</span></div>
           <div class="metric-value">${res.responsibles.length}</div>
-          <div class="metric-foot"><span class="trend-up">● Líderes de Área</span><span>Asignación por indicador</span></div>
+          <div class="metric-foot"><span class="trend-up">● Líderes Asignados</span><span>100% de KPIs con Responsable</span></div>
         </div>
       </section>
 
-      <!-- BARRA DE FILTRO POR RESPONSABLE Y ESTADO -->
-      <div class="dashboard-toolbar">
-        <div class="filter-row dashboard-responsible-filter">
-          <strong>👤 Filtrar por Responsable:</strong>
-          <select id="dashFilterResp" class="filter-select">
-            <option value="">-- Todos los Responsables (${res.responsibles.length}) --</option>
-            ${res.responsibles.map(r => `<option value="${escapeHtml(r.responsible)}" ${activeRespFilter === r.responsible ? 'selected' : ''}>${escapeHtml(r.responsible)} (${escapeHtml(r.responsible_area)})</option>`).join("")}
-          </select>
-          ${activeRespFilter ? `<button class="btn small soft" id="btnClearRespFilter">✕ Limpiar filtro</button>` : ""}
-        </div>
-        <div class="supporting-text">
-          Mostrando <strong>${g.total}</strong> KPIs
-        </div>
+      <!-- 4 PERSPECTIVAS ESTRATÉGICAS DEL BSC (INTERACTIVAS) -->
+      <div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <strong style="font-size:13px;color:#1e293b;letter-spacing:-0.02em">Las 4 Perspectivas del Balanced Scorecard (Haz clic en una para filtrar)</strong>
+        ${activeExcelFilter ? `<button class="btn small soft" id="btnResetPerspFilter">✕ Quitar filtro (${activeExcelFilter})</button>` : ""}
       </div>
+      <section class="persp-cards-grid">
+        ${perspCardsHtml}
+      </section>
 
-      <!-- BANNER DE RESUMEN EJECUTIVO -->
-      <section class="health-summary-banner">
-        <div class="health-title">
-          <div class="health-badge ${g.status_key}">
-            ⚠️ Cumplimiento Promedio: ${fmt(g.avg_pct)}% — ${g.status_text}
+      <!-- BARRA DE HERRAMIENTAS Y FILTROS INTUITIVOS -->
+      <section class="modern-toolbar">
+        <div class="toolbar-top-row">
+          <div class="persp-filter-pills">
+            <button class="persp-pill-btn ${!activeExcelFilter ? 'active' : ''}" data-filter-persp="">🌐 Todo el BSC (${res.all_kpis.length})</button>
+            <button class="persp-pill-btn ${activeExcelFilter === 'financiera' ? 'active' : ''}" data-filter-persp="financiera">💰 Financiera (9)</button>
+            <button class="persp-pill-btn ${activeExcelFilter === 'clientes' ? 'active' : ''}" data-filter-persp="clientes">👥 Clientes (9)</button>
+            <button class="persp-pill-btn ${activeExcelFilter === 'procesos' ? 'active' : ''}" data-filter-persp="procesos">🔧 Procesos (9)</button>
+            <button class="persp-pill-btn ${activeExcelFilter === 'aprendizaje' ? 'active' : ''}" data-filter-persp="aprendizaje">📚 Aprendizaje (9)</button>
           </div>
-          <span class="supporting-text">(Datos actualizados)</span>
-        </div>
-        <div class="health-stats">
-          <span class="pill-stat good">✅ LOGRADO: ${g.logrado} KPIs</span>
-          <span class="pill-stat warn">⚠️ EN RIESGO: ${g.riesgo} KPIs</span>
-          <span class="pill-stat bad">❌ CRÍTICO: ${g.critico} KPIs</span>
-          <div class="view-tabs" style="margin-left:12px">
-            <button class="view-tab ${dashboardViewMode === 'matriz' ? 'active' : ''}" data-view="matriz">📋 Matriz BSC Completa</button>
+          <div class="view-tabs">
+            <button class="view-tab ${dashboardViewMode === 'matriz' ? 'active' : ''}" data-view="matriz">📋 Tabla de Indicadores</button>
             <button class="view-tab ${dashboardViewMode === 'cuadrantes' ? 'active' : ''}" data-view="cuadrantes">▦ Cuadrantes BSC</button>
             <button class="view-tab ${dashboardViewMode === 'graficos' ? 'active' : ''}" data-view="graficos">📈 Gráficos</button>
           </div>
+        </div>
+
+        <div class="toolbar-search-row">
+          <div class="search-input-wrap">
+            <span class="search-icon-fixed">⌕</span>
+            <input type="search" id="kpiSearchInput" value="${escapeHtml(kpiSearchTerm)}" placeholder="Buscar KPI por código, nombre, objetivo, líder responsable...">
+          </div>
+          <div class="status-filters">
+            <button class="status-pill-btn ${!activeStatusFilter ? 'active' : ''}" data-filter-status="">Todos</button>
+            <button class="status-pill-btn ${activeStatusFilter === 'good' ? 'active' : ''}" data-filter-status="good">✅ Logrados (${g.logrado})</button>
+            <button class="status-pill-btn ${activeStatusFilter === 'warn' ? 'active' : ''}" data-filter-status="warn">⚠️ En Riesgo (${g.riesgo})</button>
+            <button class="status-pill-btn ${activeStatusFilter === 'bad' ? 'active' : ''}" data-filter-status="bad">❌ Críticos (${g.critico})</button>
+          </div>
+          <select id="dashFilterResp" class="filter-select" style="min-width:210px">
+            <option value="">-- Todos los Responsables (${res.responsibles.length}) --</option>
+            ${res.responsibles.map(r => `<option value="${escapeHtml(r.responsible)}" ${activeRespFilter === r.responsible ? 'selected' : ''}>${escapeHtml(r.responsible)} (${escapeHtml(r.responsible_area)})</option>`).join("")}
+          </select>
+          ${(activeExcelFilter || activeStatusFilter || kpiSearchTerm || activeRespFilter) ? `<button class="btn small soft" id="btnClearAllFilters">✕ Limpiar filtros</button>` : ""}
         </div>
       </section>
 
       <!-- CONTENIDO PRINCIPAL SEGÚN MODO SELECCIONADO -->
       <section id="dashboardMainArea">${contentHtml}</section>
-
-      <!-- TABLA DE KPIS QUE REQUIEREN ATENCIÓN -->
-      <section class="panel" style="margin-top:20px">
-        <div class="panel-head">
-          <div>
-            <h3>⚠️ Indicadores Críticos que Requieren Atención Inmediata (${res.critical_kpis.length})</h3>
-            <p>KPIs con cumplimiento menor al 75%, sus líderes responsables y acciones recomendadas</p>
-          </div>
-          <button class="btn small primary" data-action="go-mediciones">＋ Registrar medición</button>
-        </div>
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>KPI</th>
-                <th>Responsable</th>
-                <th>Área</th>
-                <th>Meta</th>
-                <th>Real Actual</th>
-                <th>% Cumpl.</th>
-                <th>Acción Correctiva Recomendada</th>
-                <th>Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${res.critical_kpis.map(k => `
-                <tr>
-                  <td><strong>${escapeHtml(k.name)}</strong></td>
-                  <td>${renderRespChip(k.responsible, k.responsible_area)}</td>
-                  <td><span class="tag">${escapeHtml(k.responsible_area)}</span></td>
-                  <td>${fmt(k.target)} <small class="muted">${escapeHtml(k.unit)}</small></td>
-                  <td><strong class="result-value">${fmt(k.current_real)}</strong></td>
-                  <td><span class="status bad">❌ ${fmt(k.compliance_pct)}%</span></td>
-                  <td style="max-width:300px;white-space:normal;font-size:11px">${escapeHtml(k.action_recommended)}</td>
-                  <td><button class="btn small soft" data-action="quick-measure" data-id="${escapeHtml(k.id)}">Medir</button></td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-      </section>
     `;
 
     bindDashboardEvents();
@@ -375,104 +412,104 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
     }
   }
 
-  function renderBscMatrixTable(allKpis, filter) {
-    const list = filter ? allKpis.filter(k => k.perspective_id === filter) : allKpis;
-    const persps = [
-      { key: "financiera", label: "💰 PERSPECTIVA FINANCIERA", color: "#1f3864" },
-      { key: "clientes", label: "👥 PERSPECTIVA DE CLIENTES", color: "#1e4d2b" },
-      { key: "procesos", label: "🔧 PERSPECTIVA DE PROCESOS INTERNOS", color: "#9a4b08" },
-      { key: "aprendizaje", label: "📚 PERSPECTIVA DE APRENDIZAJE Y CRECIMIENTO", color: "#4a2373" }
-    ].filter(p => !filter || p.key === filter);
+  function renderModernKpiTable(kpis) {
+    if (!kpis.length) {
+      return `
+        <div class="empty-state" style="padding:48px 24px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;text-align:center">
+          <div style="font-size:32px;margin-bottom:8px">🔍</div>
+          <h3 style="margin:0 0 6px;color:#1e293b">No se encontraron indicadores</h3>
+          <p style="color:#64748b;font-size:12px;margin:0 0 16px">Ningún KPI coincide con los criterios de búsqueda o filtros seleccionados.</p>
+          <button class="btn small primary" id="btnResetFiltersEmpty">Restablecer filtros</button>
+        </div>
+      `;
+    }
 
-    let rowsHtml = "";
-    persps.forEach(p => {
-      const pKpis = list.filter(k => k.perspective_id === p.key).sort((a, b) => a.objective_id.localeCompare(b.objective_id) || a.num - b.num);
-      if (!pKpis.length) return;
+    const rows = kpis.map(k => {
+      const pct = Number(k.compliance_pct);
+      const statusClass = pct >= 90 ? 'good' : (pct >= 75 ? 'warn' : 'bad');
+      const barFillClass = pct >= 90 ? 'good' : (pct >= 75 ? 'warn' : 'bad');
 
-      const pAvg = (pKpis.reduce((acc, k) => acc + Number(k.compliance_pct), 0) / pKpis.length).toFixed(1);
-
-      // Fila de encabezado completo de la Perspectiva
-      rowsHtml += `
-        <tr class="persp-header-row ${p.key}">
-          <td colspan="8">
-            <div class="persp-header-content">
-              <span>${p.label}</span>
-              <span class="persp-meta">${pKpis.length} Indicadores · Promedio: ${pAvg}%</span>
+      return `
+        <tr>
+          <td>
+            <div class="kpi-title-block">
+              <strong>${escapeHtml(k.id)} — ${escapeHtml(k.name)}</strong>
+              <small>${escapeHtml(k.objective_full_name || k.objective_name || '')}</small>
             </div>
+          </td>
+          <td>
+            <span class="persp-tag ${k.perspective_id}">
+              ${escapeHtml(k.perspective_name || k.perspective_id)}
+            </span>
+          </td>
+          <td>
+            ${renderRespChip(k.responsible, k.responsible_area)}
+          </td>
+          <td style="white-space:nowrap">
+            <b>${fmt(k.target)}</b> <small class="muted">${escapeHtml(k.unit)}</small>
+          </td>
+          <td style="white-space:nowrap">
+            <button class="kpi-num-btn" data-action="quick-measure" data-id="${escapeHtml(k.id)}" title="Haz clic para registrar nueva medición en SQLite">
+              ${fmt(k.current_real)} ✎
+            </button>
+          </td>
+          <td>
+            <div class="kpi-prog-wrap">
+              <div class="kpi-prog-bar">
+                <div class="fill ${barFillClass}" style="width:${Math.min(100, Math.max(5, pct))}%"></div>
+              </div>
+              <strong style="color:${pct >= 90 ? '#15803d' : (pct >= 75 ? '#b45309' : '#b91c1c')};font-size:11.5px">
+                ${fmt(pct)}%
+              </strong>
+            </div>
+          </td>
+          <td>
+            <span class="kpi-status-badge ${statusClass}">
+              ${escapeHtml(k.status)}
+            </span>
+          </td>
+          <td style="max-width:240px;font-size:11px;color:#475569;line-height:1.4">
+            ${escapeHtml(k.action_recommended)}
+          </td>
+          <td>
+            <button class="btn small soft" data-action="quick-measure" data-id="${escapeHtml(k.id)}" title="Registrar resultado">
+              + Medir
+            </button>
           </td>
         </tr>
       `;
-
-      pKpis.forEach((kpi) => {
-        const objKpis = pKpis.filter(x => x.objective_id === kpi.objective_id);
-        const isFirstInObj = objKpis[0].id === kpi.id;
-        const statusClass = (kpi.compliance_pct >= 90) ? "good" : (kpi.compliance_pct >= 75) ? "warn" : "bad";
-
-        rowsHtml += `
-          <tr>
-            ${isFirstInObj ? `<td class="excel-obj-cell" rowspan="${objKpis.length}"><b>${escapeHtml(kpi.objective_full_name)}</b></td>` : ""}
-            <td class="excel-td">
-              <strong style="color:#0f2442">${escapeHtml(kpi.id)}: ${escapeHtml(kpi.name)}</strong>
-              <div style="margin-top:5px">${renderRespChip(kpi.responsible, kpi.responsible_area)}</div>
-            </td>
-            <td class="excel-td text-center">${escapeHtml(kpi.unit)}</td>
-            <td class="excel-td excel-bold-num">${fmt(kpi.target)}</td>
-            <td class="excel-td excel-blue-num">
-              <button class="text-action" data-action="quick-measure" data-id="${escapeHtml(kpi.id)}" title="Haz clic para registrar medición" aria-label="Registrar resultado de ${escapeHtml(kpi.name)}">
-                ${fmt(kpi.current_real)} ✎
-              </button>
-            </td>
-            <td class="excel-td excel-bold-num" style="color:${kpi.compliance_pct >= 90 ? '#15803d' : kpi.compliance_pct >= 75 ? '#b45309' : '#b91c1c'}">
-              ${fmt(kpi.compliance_pct)}%
-            </td>
-            <td class="excel-td text-center">
-              <span class="kpi-status-badge ${statusClass}">
-                ${escapeHtml(kpi.status)}
-              </span>
-            </td>
-            <td class="excel-td" style="font-size:11px;max-width:280px;white-space:normal;color:#475569;line-height:1.4">
-              ${escapeHtml(kpi.action_recommended)}
-            </td>
-          </tr>
-        `;
-      });
-    });
+    }).join("");
 
     return `
-    <div class="excel-container">
-      <div class="excel-title-banner">
-        <span>📋 TABLERO OFICIAL DEL BALANCED SCORECARD — TECHPERU SAC 2025</span>
-        <span style="opacity:0.9;font-weight:600;font-size:11px">${list.length} Indicadores en Base de Datos</span>
+      <div class="modern-table-panel">
+        <div class="modern-table-header-info">
+          <div>
+            <strong style="font-size:13px;color:#0f172a">Matriz Oficial de Indicadores (${kpis.length} KPIs evaluados)</strong>
+            <p style="font-size:11px;color:#64748b;margin:2px 0 0">Datos oficiales almacenados en base de datos SQLite · Haz clic en el valor con ✎ o en "+ Medir" para actualizar cualquier resultado.</p>
+          </div>
+          <span class="tag" style="background:#eff6ff;color:#1d4ed8;font-weight:700">Base de Datos Activa</span>
+        </div>
+        <div class="table-scroll">
+          <table class="modern-kpi-table">
+            <thead>
+              <tr>
+                <th style="min-width:250px">Indicador & Objetivo</th>
+                <th>Perspectiva</th>
+                <th>Líder Responsable</th>
+                <th>Meta</th>
+                <th>Real Actual</th>
+                <th style="min-width:140px">Progreso</th>
+                <th>Estado</th>
+                <th style="min-width:220px">Acción / Recomendación</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div class="table-help" style="padding:10px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:11px">
-        <span>💡 <strong>Valores en AZUL:</strong> Haz clic en el número con ✎ para registrar una nueva medición en SQLite.</span>
-        <span>Regla Semáforo: <b style="color:#15803d">✅ ≥90%</b> | <b style="color:#b45309">⚠️ 75-89%</b> | <b style="color:#b91c1c">❌ &lt;75%</b></span>
-      </div>
-      <div class="table-scroll">
-        <table class="excel-table">
-          <thead>
-            <tr>
-              <th class="excel-th" style="width:200px">OBJETIVO ESTRATÉGICO</th>
-              <th class="excel-th">INDICADOR (KPI) Y RESPONSABLE</th>
-              <th class="excel-th" style="width:65px">UNIDAD</th>
-              <th class="excel-th" style="width:75px">META</th>
-              <th class="excel-th" style="width:80px">REAL</th>
-              <th class="excel-th" style="width:80px">% CUMPL.</th>
-              <th class="excel-th" style="width:125px">ESTADO</th>
-              <th class="excel-th" style="width:280px">ANÁLISIS / ACCIÓN RECOMENDADA</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div>
-      <div class="excel-sheet-tabs">
-        <button class="excel-sheet-tab ${!filter ? 'active' : ''}" data-sheet-filter="">📋 Todo el BSC (36 KPIs)</button>
-        <button class="excel-sheet-tab ${filter === 'financiera' ? 'active' : ''}" data-sheet-filter="financiera">💰 Financiera (9)</button>
-        <button class="excel-sheet-tab ${filter === 'clientes' ? 'active' : ''}" data-sheet-filter="clientes">👥 Clientes (9)</button>
-        <button class="excel-sheet-tab ${filter === 'procesos' ? 'active' : ''}" data-sheet-filter="procesos">🔧 Procesos Internos (9)</button>
-        <button class="excel-sheet-tab ${filter === 'aprendizaje' ? 'active' : ''}" data-sheet-filter="aprendizaje">📚 Aprendizaje y Crecimiento (9)</button>
-      </div>
-    </div>
     `;
   }
 
@@ -594,25 +631,118 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   function bindDashboardEvents() {
     $('#btnExportDashCSV').onclick = () => { location.href = 'api/reports.php?action=export_csv'; };
     $('#btnNewMeasurement').onclick = () => runAction(() => openMeasurementModal());
-    $('#dashFilterResp').onchange = event => { activeRespFilter = event.target.value || null; renderCurrentPage(); };
-    if ($('#btnClearRespFilter')) $('#btnClearRespFilter').onclick = () => { activeRespFilter = null; renderCurrentPage(); };
+
+    // Tarjetas de perspectiva
+    $$('[data-persp-card]').forEach(card => {
+      card.onclick = () => {
+        const id = card.dataset.perspCard;
+        activeExcelFilter = (activeExcelFilter === id) ? null : id;
+        renderCurrentPage();
+      };
+    });
+
+    // Pills de perspectiva
+    $$('[data-filter-persp]').forEach(btn => {
+      btn.onclick = () => {
+        activeExcelFilter = btn.dataset.filterPersp || null;
+        renderCurrentPage();
+      };
+    });
+
+    // Filtros de estado
+    $$('[data-filter-status]').forEach(btn => {
+      btn.onclick = () => {
+        activeStatusFilter = btn.dataset.filterStatus || null;
+        renderCurrentPage();
+      };
+    });
+
+    // Búsqueda en vivo
+    const searchInput = $('#kpiSearchInput');
+    if (searchInput) {
+      searchInput.oninput = (e) => {
+        kpiSearchTerm = e.target.value;
+        const mainArea = $('#dashboardMainArea');
+        if (dashboardViewMode === 'matriz' && currentDashboardData) {
+          let list = currentDashboardData.all_kpis;
+          if (activeExcelFilter) list = list.filter(k => k.perspective_id === activeExcelFilter);
+          if (activeStatusFilter) {
+            list = list.filter(k => {
+              const p = Number(k.compliance_pct);
+              if (activeStatusFilter === 'good') return p >= 90;
+              if (activeStatusFilter === 'warn') return p >= 75 && p < 90;
+              if (activeStatusFilter === 'bad') return p < 75;
+              return true;
+            });
+          }
+          if (kpiSearchTerm) {
+            const q = kpiSearchTerm.toLowerCase();
+            list = list.filter(k => 
+              k.name.toLowerCase().includes(q) ||
+              k.id.toLowerCase().includes(q) ||
+              (k.objective_name && k.objective_name.toLowerCase().includes(q)) ||
+              (k.responsible && k.responsible.toLowerCase().includes(q)) ||
+              (k.responsible_area && k.responsible_area.toLowerCase().includes(q))
+            );
+          }
+          mainArea.innerHTML = renderModernKpiTable(list);
+          mainArea.querySelectorAll('[data-action="quick-measure"]').forEach(b => {
+            b.onclick = () => runAction(() => openMeasurementModal(b.dataset.id));
+          });
+          if ($('#btnResetFiltersEmpty')) {
+            $('#btnResetFiltersEmpty').onclick = () => {
+              activeExcelFilter = null;
+              activeStatusFilter = null;
+              kpiSearchTerm = "";
+              renderCurrentPage();
+            };
+          }
+        }
+      };
+    }
+
+    // Filtro por responsable
+    const respSelect = $('#dashFilterResp');
+    if (respSelect) {
+      respSelect.onchange = (e) => {
+        activeRespFilter = e.target.value || null;
+        renderCurrentPage();
+      };
+    }
+
+    // Botones de reseteo de filtros
+    if ($('#btnResetPerspFilter')) {
+      $('#btnResetPerspFilter').onclick = () => { activeExcelFilter = null; renderCurrentPage(); };
+    }
+    if ($('#btnClearAllFilters')) {
+      $('#btnClearAllFilters').onclick = () => {
+        activeExcelFilter = null;
+        activeStatusFilter = null;
+        kpiSearchTerm = "";
+        activeRespFilter = null;
+        renderCurrentPage();
+      };
+    }
+    if ($('#btnResetFiltersEmpty')) {
+      $('#btnResetFiltersEmpty').onclick = () => {
+        activeExcelFilter = null;
+        activeStatusFilter = null;
+        kpiSearchTerm = "";
+        activeRespFilter = null;
+        renderCurrentPage();
+      };
+    }
+
+    // Pestañas de modo de vista
     $$('[data-view]').forEach(button => {
       button.setAttribute('aria-pressed', String(button.dataset.view === dashboardViewMode));
       button.onclick = () => { dashboardViewMode = button.dataset.view; renderCurrentPage(); };
     });
-    $$('[data-sheet-filter]').forEach(button => {
-      button.setAttribute('aria-pressed', String(button.dataset.sheetFilter === (activeExcelFilter || '')));
-      button.onclick = () => {
-        activeExcelFilter = button.dataset.sheetFilter || null;
-        $('#dashboardMainArea').innerHTML = renderBscMatrixTable(currentDashboardData.all_kpis, activeExcelFilter);
-        bindDashboardEvents();
-        enhanceContent($('#dashboardMainArea'));
-      };
-    });
+
+    // Medición rápida en botones
     $("#pageContent").querySelectorAll('[data-action="quick-measure"]').forEach(button => {
       button.onclick = () => runAction(() => openMeasurementModal(button.dataset.id));
     });
-    $$('[data-action="go-mediciones"]').forEach(button => { button.onclick = () => navigate('mediciones'); });
   }
 
   // 2. MAPA ESTRATÉGICO
