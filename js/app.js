@@ -63,10 +63,10 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
   };
 
   const perspectives = {
-    financiera: { label: "Financiera", title: "PERSPECTIVA FINANCIERA", color: "#1d4ed8", soft: "#eff6ff", iconKey: "financiera" },
-    clientes: { label: "Clientes", title: "PERSPECTIVA DE CLIENTES", color: "#0d9488", soft: "#f0fdf4", iconKey: "clientes" },
-    procesos: { label: "Procesos internos", title: "PERSPECTIVA DE PROCESOS INTERNOS", color: "#6366f1", soft: "#f5f3ff", iconKey: "procesos" },
-    aprendizaje: { label: "Aprendizaje y crecimiento", title: "PERSPECTIVA DE APRENDIZAJE Y CRECIMIENTO", color: "#d97706", soft: "#fffbeb", iconKey: "aprendizaje" }
+    financiera: { label: "Financiera", title: "PERSPECTIVA FINANCIERA", color: "#1d4ed8", soft: "#eff6ff", iconKey: "financiera", icon: ICONS.financiera },
+    clientes: { label: "Clientes", title: "PERSPECTIVA DE CLIENTES", color: "#0d9488", soft: "#f0fdf4", iconKey: "clientes", icon: ICONS.clientes },
+    procesos: { label: "Procesos internos", title: "PERSPECTIVA DE PROCESOS INTERNOS", color: "#6366f1", soft: "#f5f3ff", iconKey: "procesos", icon: ICONS.procesos },
+    aprendizaje: { label: "Aprendizaje y crecimiento", title: "PERSPECTIVA DE APRENDIZAJE Y CRECIMIENTO", color: "#d97706", soft: "#fffbeb", iconKey: "aprendizaje", icon: ICONS.aprendizaje }
   };
 
   const pageTitles = {
@@ -982,8 +982,9 @@ import { $, $$, escapeHtml, fmt, currency, today } from './core.js';
       return `
       <div class="map-lane">
         <div class="map-lane-label" style="background:${p.soft};color:${p.color}">
-          <div style="font-size:20px;margin-bottom:6px">${p.icon}</div>
-          <b>${p.label.toUpperCase()}</b>
+          <span style="font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:3px;opacity:0.9">PERSPECTIVA</span>
+          <div style="font-size:18px;margin-bottom:4px;display:grid;place-items:center">${ICONS[p.iconKey] || ''}</div>
+          <b style="font-size:13px;font-weight:800;line-height:1.2;text-align:center">${p.label.toUpperCase()}</b>
         </div>
         <div class="map-lane-items">
           ${pObjs.map(o => {
